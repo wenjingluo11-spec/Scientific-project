@@ -1,0 +1,201 @@
+import React, { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Input, Button, Table, Tag, Space, Modal, Form, Select, message } from 'antd'
+import { SearchOutlined, PlusOutlined } from '@ant-design/icons'
+import type { RootState, AppDispatch } from '@/store/store'
+import { fetchTopics, createTopic, searchTopics, setSelectedTopic, Topic } from '@/store/slices/topicsSlice'
+
+const { TextArea } = Input
+const { Option } = Select
+
+const TopicManagement: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>()
+  const { topics, loading } = useSelector((state: RootState) => state.topics)
+  const [isModalVisible, setIsModalVisible] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [form] = Form.useForm()
+
+  useEffect(() => {
+    dispatch(fetchTopics())
+  }, [dispatch])
+
+  const handleSearch = (value: string) => {
+    if (value.trim()) {
+      dispatch(searchTopics(value))
+    } else {
+      dispatch(fetchTopics())
+    }
+  }
+
+  const handleCreateTopic = async (values: any) => {
+    try {
+      await dispatch(createTopic({
+        title: values.title,
+        description: values.description,
+        field: values.field,
+        keywords: values.keywords?.split(',').map((k: string) => k.trim()) || [],
+      })).unwrap()
+      message.success('选题创建成功！')
+      setIsModalVisible(false)
+      form.resetFields()
+    } catch (error) {
+      message.error('创建失败，请重试')
+    }
+  }
+
+  const columns = [
+    {
+      title: '标题',
+      dataIndex: 'title',
+      key: 'title',
+      width: '30%',
+    },
+    {
+      title: '研究领域',
+      dataIndex: 'field',
+      key: 'field',
+      width: '15%',
+    },
+    {
+      title: '关键词',
+      dataIndex: 'keywords',
+      key: 'keywords',
+      width: '25%',
+      render: (keywords: string[]) => (
+        <>
+          {keywords?.map((keyword) => (
+            <Tag color="blue" key={keyword}>
+              {keyword}
+            </Tag>
+          ))}
+        </>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: '10%',
+      render: (status: string) => {
+        const colorMap: Record<string, string> = {
+          pending: 'default',
+          processing: 'processing',
+          completed: 'success',
+        }
+        return <Tag color={colorMap[status]}>{status}</Tag>
+      },
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: '15%',
+      render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: '5%',
+      render: (_: any, record: Topic) => (
+        <Space size="middle">
+          <Button type="link" onClick={() => dispatch(setSelectedTopic(record))}>
+            查看
+          </Button>
+        </Space>
+      ),
+    },
+  ]
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', gap: 16 }}>
+        <Input.Search
+          placeholder="搜索选题、关键词..."
+          allowClear
+          enterButton={<SearchOutlined />}
+          size="large"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onSearch={handleSearch}
+          style={{ flex: 1 }}
+        />
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          size="large"
+          onClick={() => setIsModalVisible(true)}
+        >
+          新建选题
+        </Button>
+      </div>
+
+      <Table
+        columns={columns}
+        dataSource={topics}
+        loading={loading}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+      />
+
+      <Modal
+        title="创建新选题"
+        open={isModalVisible}
+        onCancel={() => {
+          setIsModalVisible(false)
+          form.resetFields()
+        }}
+        footer={null}
+        width={600}
+      >
+        <Form form={form} layout="vertical" onFinish={handleCreateTopic}>
+          <Form.Item
+            name="title"
+            label="选题标题"
+            rules={[{ required: true, message: '请输入选题标题' }]}
+          >
+            <Input placeholder="例如：基于深度学习的医学图像分析" />
+          </Form.Item>
+
+          <Form.Item
+            name="field"
+            label="研究领域"
+            rules={[{ required: true, message: '请选择研究领域' }]}
+          >
+            <Select placeholder="选择研究领域">
+              <Option value="计算机科学">计算机科学</Option>
+              <Option value="人工智能">人工智能</Option>
+              <Option value="生物医学">生物医学</Option>
+              <Option value="物理学">物理学</Option>
+              <Option value="化学">化学</Option>
+              <Option value="材料科学">材料科学</Option>
+              <Option value="经济学">经济学</Option>
+              <Option value="其他">其他</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="keywords" label="关键词">
+            <Input placeholder="多个关键词用逗号分隔，例如：深度学习,医学影像,CNN" />
+          </Form.Item>
+
+          <Form.Item name="description" label="选题描述">
+            <TextArea
+              rows={4}
+              placeholder="描述研究的背景、目标和意义..."
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                创建
+              </Button>
+              <Button onClick={() => setIsModalVisible(false)}>取消</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  )
+}
+
+export default TopicManagement

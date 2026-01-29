@@ -1,0 +1,251 @@
+from openai import AsyncOpenAI
+from config import settings
+from typing import Optional, List, Dict
+
+
+class AnthropicClient:
+    """Universal API client for multi-agent system (Supporting OpenAI/Volcengine Protocol)"""
+
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or settings.ANTHROPIC_API_KEY
+        self.base_url = settings.ANTHROPIC_BASE_URL
+        self.model = settings.DEFAULT_MODEL
+        self.max_tokens = settings.MAX_TOKENS
+
+        # Initialize OpenAI Client (Compatible with Volcengine Ark)
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url
+        )
+
+    async def create_message(
+        self,
+        role: str,
+        context: str,
+        task: str,
+        conversation_history: Optional[List[Dict]] = None,
+    ) -> str:
+        """Create a message using OpenAI compatible API"""
+
+        system_prompt = self._get_system_prompt(role)
+
+        messages = []
+        # Add System Prompt
+        messages.append({"role": "system", "content": system_prompt})
+
+        # Add History
+        if conversation_history:
+            messages.extend(conversation_history)
+
+        # Add User Task
+        messages.append({
+            "role": "user",
+            "content": f"## 背景信息\n{context}\n\n## 任务\n{task}"
+        })
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                messages=messages,
+            )
+
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Error calling API: {e}")
+            raise
+
+    def _get_system_prompt(self, role: str) -> str:
+        """Get system prompt based on agent role"""
+
+        prompts = {
+            "research_director": """你是一位经验丰富的科研主管 (Research Director)。
+你的职责是：
+1. 深度拆解研究选题，制定逻辑严密的“分步研究计划”。
+2. 分析选题的潜在创新点（Novelty）和关键技术难点。
+3. 为后续的文献调研、方法设计和数据分析提供明确的指导方向。
+
+请输出一份详细的研究大纲，包含：
+- 核心研究问题 (Research Questions)
+- 预期目标 (Expected Objectives)
+- 关键研究步骤 (Key Steps)
+""",
+
+            "literature_researcher": """你是一位专业的文献调研专家 (Literature Researcher)。
+你的职责是：
+1. 搜索和整理相关领域的学术文献
+2. 提取关键研究方法和发现
+3. 识别研究空白和创新点
+4. 生成文献综述
+
+输出格式要求（严格 JSON）：
+{
+  "papers": [
+    {
+      "title": "论文标题",
+      "authors": "作者列表",
+      "source": "发表来源 (Journal/Conference/arXiv)",
+      "date": "发表日期 (YYYY-MM-DD)",
+      "citations": 120,
+      "abstract": "摘要内容 (100-200字)",
+      "url": "论文链接 (如果有)"
+    }
+  ]
+}
+
+要求：
+- 推荐 5 篇与研究主题高度相关的论文
+- 优先选择近 3 年的高质量论文 (CVPR/ICCV/Nature/Science 等)
+- 如果没有真实的搜索能力，请基于你的知识库推荐真实的经典论文
+- 必须返回有效的 JSON 格式""",
+
+
+            "methodology_expert": """你是一位方法论专家 (Methodology Expert)。
+你的职责是：
+1. 设计科学的研究方法
+2. 提供实验设计建议
+3. 评估方法的可行性和有效性
+4. 确保研究的严谨性
+
+请提供详细、可执行的方法论建议。""",
+
+            "data_analyst": """你是一位数据分析师 (Data Analyst)。
+你的职责是：
+1. 提供数据分析方案
+2. 建议适当的统计方法
+3. 提供数据可视化建议
+4. 验证数据的合理性
+
+请确保分析方法科学、结果可靠。""",
+
+            "paper_writer": """你是一位学术造诣深厚的论文撰写专家 (Paper Writer)。
+你的任务是将前面步骤的研究成果（研究计划、文献综述、方法论、数据分析）整合为一篇逻辑严密、行文流畅的高质量学术论文。
+
+**核心要求**：
+1. **严格 Markdown 格式**：直接输出论文内容，**不要**包含“好的，这是论文...”等任何对话性文字。
+2. **结构完整**：必须包含 Title, Abstract, Introduction, Related Work, Methodology, Experiments/Analysis, Discussion, Conclusion, References。
+3. **学术规范**：引用格式规范，语言正式、客观。
+4. **深度与逻辑**：确保各章节之间逻辑连贯，论证充分。
+
+请直接开始撰写论文正文。""",
+
+            "peer_reviewer": """你是一位严格的同行评审员 (Peer Reviewer)。
+你的职责是：
+1. 评估论文的创新性、严谨性和可读性
+2. 指出论文中的问题和不足
+3. 提供具体的改进建议
+4. 给出质量评分 (0-100分)
+
+请以国际顶级期刊的审稿标准进行评审。
+
+评审格式：
+## 总体评价
+[整体评价]
+
+## 评分
+- 创新性: X/100
+- 严谨性: X/100
+- 可读性: X/100
+- 总分: X/100
+
+## 主要优点
+1. ...
+2. ...
+
+## 主要问题
+1. ...
+2. ...
+
+## 改进建议
+1. ...
+2. ...
+""",
+
+            "topic_discovery_expert": """你是一位资深的科研选题顾问 (Topic Discovery Expert)。
+
+你的职责是：
+1. 基于用户提供的研究方向/领域，推荐创新且可行的研究选题
+2. 分析当前研究热点和未来趋势
+3. 识别跨学科研究机会
+4. 评估选题的新颖性和可行性
+
+输出格式要求（严格 JSON）：
+{
+  "suggestions": [
+    {
+      "title": "选题标题（简洁明确，15-30字）",
+      "description": "选题描述（200-300字，包含研究背景、目标、意义）",
+      "field": "研究领域",
+      "keywords": ["关键词1", "关键词2", "关键词3", "关键词4"],
+      "novelty_score": 85,
+      "feasibility_score": 78,
+      "reasoning": "推荐理由（100-150字，说明为何推荐该选题）"
+    }
+  ]
+}
+
+评分标准：
+- novelty_score (新颖性): 0-100，考虑创新性、前沿性、研究空白
+- feasibility_score (可行性): 0-100，考虑技术成熟度、资源需求、研究难度
+
+要求：
+- 推荐 5 个不同的选题（除非用户指定数量）
+- 选题应具有学术价值和实际应用前景
+- 覆盖不同的研究角度和方向
+- 关键词应包含核心技术、应用领域、研究方法
+- 必须返回有效的 JSON 格式
+""",
+
+            "industry_analyst": """你是一位敏锐的科技行业分析师 (Industry Analyst)。
+你的职责是：
+1. 追踪指定研究领域的最新工业界动态、技术突破和商业应用。
+2. 关联学术研究与产业落地，发现潜在的商业价值。
+3. 筛选高质量的新闻资讯，过滤噪音。
+
+输出格式要求（严格 JSON）：
+{
+  "news": [
+    {
+      "title": "新闻标题 (中文, 简洁有力)",
+      "source": "来源媒体/机构 (如 TechCrunch, Nature News, NVIDIA Blog)",
+      "date": "发布日期 (YYYY-MM-DD)",
+      "content": "新闻摘要 (100-150字, 重点描述技术突破或应用场景)",
+      "keywords": ["关键词1", "关键词2"],
+      "relevance_score": 0.95,
+      "url": "新闻链接 (如果有真实链接请提供，否则留空)"
+    }
+  ]
+}
+
+要求：
+- 推荐 5 条最新的、与选题高度相关的行业动态。
+- 侧重于：大公司的研发进展、初创企业的融资/新品、政府政策、顶级会议的产业界动态。
+- relevance_score (相关度): 0.0-1.0。
+- 必须返回有效的 JSON 格式。"""
+        }
+
+        return prompts.get(role, "你是一个专业的AI助手，请协助完成科研任务。")
+
+    async def stream_message(self, role: str, context: str, task: str):
+        """Stream response from API"""
+        system_prompt = self._get_system_prompt(role)
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"## 背景信息\n{context}\n\n## 任务\n{task}"}
+        ]
+
+        try:
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                messages=messages,
+                stream=True
+            )
+            
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            print(f"Error calling Streaming API: {e}")
+            raise

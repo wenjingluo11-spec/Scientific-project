@@ -1,0 +1,51 @@
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKey
+from sqlalchemy.sql import func
+from models.database import Base
+
+
+class Paper(Base):
+    __tablename__ = "papers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    topic_id = Column(Integer, ForeignKey("topics.id"))
+    title = Column(String(500), nullable=False)
+    abstract = Column(Text)
+    content = Column(Text)
+    version = Column(Integer, default=1)
+    status = Column(String(20), default="draft")  # draft/reviewing/completed
+    quality_score = Column(Float, default=0.0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "topic_id": self.topic_id,
+            "title": self.title,
+            "abstract": self.abstract,
+            "content": self.content,
+            "version": self.version,
+            "status": self.status,
+            "quality_score": self.quality_score,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AgentConversation(Base):
+    __tablename__ = "agent_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    paper_id = Column(Integer, ForeignKey("papers.id"))
+    agent_role = Column(String(50))
+    message = Column(Text)
+    iteration = Column(Integer, default=1)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "paper_id": self.paper_id,
+            "agent_role": self.agent_role,
+            "message": self.message,
+            "iteration": self.iteration,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

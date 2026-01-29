@@ -1,0 +1,26 @@
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy.sql import func
+from models.database import Base
+import json as json_lib
+
+
+class TopicRecommendation(Base):
+    """Topic recommendation history model"""
+    __tablename__ = "topic_recommendations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    research_field = Column(String(100), nullable=False)
+    keywords = Column(Text, nullable=False)  # JSON string
+    description = Column(Text, nullable=True)
+    suggestions = Column(Text, nullable=False)  # JSON string of all suggestions
+    created_at = Column(DateTime, server_default=func.now())
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "research_field": self.research_field,
+            "keywords": json_lib.loads(self.keywords) if self.keywords else [],
+            "description": self.description,
+            "suggestions": json_lib.loads(self.suggestions) if self.suggestions else [],
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }

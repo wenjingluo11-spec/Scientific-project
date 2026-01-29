@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill:*)",
+      "Bash(ping:*)"
+    ],
+    "additionalDirectories": [
+      "f:\\Scientific project"
+    ]
+  }
+}
