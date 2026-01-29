@@ -8,11 +8,11 @@ os.environ.pop("ANTHROPIC_BASE_URL", None)
 os.environ.pop("ANTHROPIC_API_KEY", None)
 
 class Settings(BaseSettings):
-    # API Keys
-    ANTHROPIC_API_KEY: str = "e934ab82-67ea-41f8-9d8d-b1aff85e7f74"
+    # API Keys - 使用旧项目的 key
+    ANTHROPIC_API_KEY: str = "sk-f3cdd22cdf5340c78eca9cc4f9b6258c"
 
-    # Anthropic API Configuration (Volcengine Compatible)
-    ANTHROPIC_BASE_URL: str = "https://ark.cn-beijing.volces.com/api/v3"
+    # Anthropic API Configuration - 注意：SDK 会自动拼接 /v1/messages
+    ANTHROPIC_BASE_URL: str = "http://127.0.0.1:8045"
 
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./database/scientific.db"
@@ -23,8 +23,9 @@ class Settings(BaseSettings):
 
     # Agent Settings
     MAX_ITERATIONS: int = 3
-    DEFAULT_MODEL: str = "ep-20250416114912-nsdxw"  # Volcengine Endpoint ID
-    MAX_TOKENS: int = 4000
+    DEFAULT_MODEL: str = "claude-haiku-4-5"  # 与旧项目一致
+    MAX_TOKENS: int = 4096  # 增加到 4096，与旧项目一致
+    API_TIMEOUT: int = 120  # 与旧项目一致
 
     # Web Scraping
     USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"

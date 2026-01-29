@@ -1,10 +1,17 @@
-from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
 from config import settings
 from typing import Optional, List, Dict
+import httpx
+import os
+
+# 清除代理环境变量，防止 502 错误 (这是导致问题的根本原因)
+for _proxy_key in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']:
+    os.environ.pop(_proxy_key, None)
+os.environ['NO_PROXY'] = '*'
 
 
 class AnthropicClient:
-    """Universal API client for multi-agent system (Supporting OpenAI/Volcengine Protocol)"""
+    """Universal API client for multi-agent system"""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or settings.ANTHROPIC_API_KEY
@@ -12,10 +19,18 @@ class AnthropicClient:
         self.model = settings.DEFAULT_MODEL
         self.max_tokens = settings.MAX_TOKENS
 
-        # Initialize OpenAI Client (Compatible with Volcengine Ark)
-        self.client = AsyncOpenAI(
+        # 创建自定义 HTTP 客户端，禁用代理和设置超时 (与旧项目 Rust 实现一致)
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(settings.API_TIMEOUT),
+            verify=True,
+            follow_redirects=True
+        )
+
+        # Initialize Anthropic Client with custom http_client
+        self.client = AsyncAnthropic(
             api_key=self.api_key,
-            base_url=self.base_url
+            base_url=self.base_url,
+            http_client=http_client
         )
 
     async def create_message(
@@ -25,13 +40,11 @@ class AnthropicClient:
         task: str,
         conversation_history: Optional[List[Dict]] = None,
     ) -> str:
-        """Create a message using OpenAI compatible API"""
+        """Create a message using Anthropic API"""
 
         system_prompt = self._get_system_prompt(role)
 
         messages = []
-        # Add System Prompt
-        messages.append({"role": "system", "content": system_prompt})
 
         # Add History
         if conversation_history:
@@ -44,13 +57,14 @@ class AnthropicClient:
         })
 
         try:
-            response = await self.client.chat.completions.create(
+            response = await self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
+                system=system_prompt,
                 messages=messages,
             )
 
-            return response.choices[0].message.content
+            return response.content[0].text
         except Exception as e:
             print(f"Error calling API: {e}")
             raise
@@ -61,7 +75,7 @@ class AnthropicClient:
         prompts = {
             "research_director": """你是一位经验丰富的科研主管 (Research Director)。
 你的职责是：
-1. 深度拆解研究选题，制定逻辑严密的“分步研究计划”。
+1. 深度拆解研究选题，制定逻辑严密的"分步研究计划"。
 2. 分析选题的潜在创新点（Novelty）和关键技术难点。
 3. 为后续的文献调研、方法设计和数据分析提供明确的指导方向。
 
@@ -122,7 +136,7 @@ class AnthropicClient:
 你的任务是将前面步骤的研究成果（研究计划、文献综述、方法论、数据分析）整合为一篇逻辑严密、行文流畅的高质量学术论文。
 
 **核心要求**：
-1. **严格 Markdown 格式**：直接输出论文内容，**不要**包含“好的，这是论文...”等任何对话性文字。
+1. **严格 Markdown 格式**：直接输出论文内容，**不要**包含"好的，这是论文..."等任何对话性文字。
 2. **结构完整**：必须包含 Title, Abstract, Introduction, Related Work, Methodology, Experiments/Analysis, Discussion, Conclusion, References。
 3. **学术规范**：引用格式规范，语言正式、客观。
 4. **深度与逻辑**：确保各章节之间逻辑连贯，论证充分。
@@ -229,23 +243,23 @@ class AnthropicClient:
     async def stream_message(self, role: str, context: str, task: str):
         """Stream response from API"""
         system_prompt = self._get_system_prompt(role)
-        
+
         messages = [
-            {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"## 背景信息\n{context}\n\n## 任务\n{task}"}
         ]
 
         try:
-            stream = await self.client.chat.completions.create(
+            stream = await self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
+                system=system_prompt,
                 messages=messages,
                 stream=True
             )
-            
+
             async for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                 if chunk.type == 'content_block_delta':
+                    yield chunk.delta.text
         except Exception as e:
             print(f"Error calling Streaming API: {e}")
             raise

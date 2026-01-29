@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(taskkill:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(python:*)"
     ],
     "additionalDirectories": [
       "f:\\Scientific project"

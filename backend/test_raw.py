@@ -1,22 +1,32 @@
 
-import requests
+from anthropic import Anthropic
+import os
 
-url = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
-headers = {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer e934ab82-67ea-41f8-9d8d-b1aff85e7f74"
-}
-data = {
-    "model": "ep-20250416114912-nsdxw",
-    "messages": [
-        {"role": "user", "content": "Hello"}
-    ]
-}
+# Configuration matching your new setup
+BASE_URL = "http://127.0.0.1:8045/v1"
+API_KEY = "sk-f3cdd22cdf5340c78eca9cc4f9b6258c"
+MODEL = "claude-haiku-4-5"
 
-print("Testing raw request...")
-try:
-    resp = requests.post(url, headers=headers, json=data, timeout=10)
-    print(f"Status: {resp.status_code}")
-    print(f"Body: {resp.text}")
-except Exception as e:
-    print(f"Error: {e}")
+def test_connection():
+    print(f"Testing connection to {BASE_URL}...")
+
+    client = Anthropic(
+        base_url=BASE_URL,
+        api_key=API_KEY
+    )
+
+    try:
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello, are you working?"}]
+        )
+
+        print("\nSuccess! Response:")
+        print(response.content[0].text)
+
+    except Exception as e:
+        print(f"\nError: {e}")
+
+if __name__ == "__main__":
+    test_connection()
