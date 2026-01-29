@@ -56,7 +56,14 @@ function startBackend() {
 
 app.whenReady().then(() => {
   createWindow();
-  startBackend();
+  const isDev = !app.isPackaged;
+  if (!isDev) {
+    // In development, the backend is started separately via npm script
+    console.log('Development mode: Backend should be started separately');
+  } else {
+    // In production, Electron starts the backend
+    startBackend();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
