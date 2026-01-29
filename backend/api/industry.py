@@ -100,7 +100,7 @@ async def search_industry_news(topic_id: int, db: AsyncSession = Depends(get_db)
 选题描述: {topic.description}
 相关关键词: {keywords_str}"""
 
-    task = "请作为一名科技行业分析师，搜索并推荐 5 条与该选题高度相关的最新行业动态。请严格遵守 JSON 格式要求。"
+    task = "请作为一名科技行业分析师，搜索并推荐 5 条与该选题高度相关的最新行业动态（**必须是 2025-2026 年的最新数据**）。请严格遵守 JSON 格式要求。"
 
     try:
         response_text = await client.create_message(

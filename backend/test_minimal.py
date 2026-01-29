@@ -18,7 +18,7 @@ async def test_minimal():
     url = "http://127.0.0.1:8045/v1/messages"
     
     headers = {
-        "x-api-key": "sk-f3cdd22cdf5340c78eca9cc4f9b6258c",
+        "x-api-key": "sk-691331534d4a403fbd2add1841357a8f",
         "anthropic-version": "2023-06-01",
         "content-type": "application/json"
     }

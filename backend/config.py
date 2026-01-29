@@ -9,7 +9,7 @@ os.environ.pop("ANTHROPIC_API_KEY", None)
 
 class Settings(BaseSettings):
     # API Keys - 使用旧项目的 key
-    ANTHROPIC_API_KEY: str = "sk-f3cdd22cdf5340c78eca9cc4f9b6258c"
+    ANTHROPIC_API_KEY: str = "sk-691331534d4a403fbd2add1841357a8f"
 
     # Anthropic API Configuration - 注意：SDK 会自动拼接 /v1/messages
     ANTHROPIC_BASE_URL: str = "http://127.0.0.1:8045"

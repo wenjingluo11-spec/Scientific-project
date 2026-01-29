@@ -10,7 +10,7 @@ import httpx
 # 使用旧项目的配置
 OLD_PROJECT_CONFIG = {
     "base_url": "http://127.0.0.1:8045",  # 旧项目用这个，不带 /v1
-    "api_key": "sk-f3cdd22cdf5340c78eca9cc4f9b6258c",  # 旧项目的 key
+    "api_key": "sk-691331534d4a403fbd2add1841357a8f",  # 旧项目的 key
     "model": "claude-haiku-4-5"
 }
 
