@@ -31,8 +31,9 @@ const initialState: CompetitorsState = {
 
 export const fetchCompetitors = createAsyncThunk(
   'competitors/fetch',
-  async (topicId: number) => {
-    const response = await api.get(`/api/v1/competitors/?topic_id=${topicId}`)
+  async (topicId?: number) => {
+    const url = topicId ? `/api/v1/competitors/?topic_id=${topicId}` : '/api/v1/competitors/'
+    const response = await api.get(url)
     return response.data
   }
 )
@@ -89,6 +90,10 @@ const competitorsSlice = createSlice({
       .addCase(fetchCompetitors.fulfilled, (state, action) => {
         state.loading = false
         state.competitors = action.payload
+      })
+      .addCase(fetchCompetitors.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.error.message || 'Failed to fetch competitors'
       })
       .addCase(searchCompetitors.pending, (state) => {
         state.loading = true

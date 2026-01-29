@@ -1,5 +1,5 @@
 import { store } from '@/store/store'
-import { updateAgentProgress } from '@/store/slices/papersSlice'
+import { updateAgentProgress, fetchPaperById } from '@/store/slices/papersSlice'
 
 class WebSocketService {
   private ws: WebSocket | null = null
@@ -19,6 +19,11 @@ class WebSocketService {
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
       store.dispatch(updateAgentProgress(data))
+
+      // If generation is complete, fetch the final paper content
+      if (data.agent === 'completed') {
+        store.dispatch(fetchPaperById(paperId))
+      }
     }
 
     this.ws.onerror = (error) => {

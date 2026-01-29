@@ -120,17 +120,17 @@ async def search_industry_news(topic_id: int, db: AsyncSession = Depends(get_db)
         data = json.loads(json_str)
         news_items = data.get("news", [])
         
-        # Map fields (especially 'date' -> 'published_at')
+        # Map fields (especially 'date' -> 'published_at') and handle potential None values
         processed_items = []
         for item in news_items:
             processed_item = {
-                "title": item.get("title", "Untitled"),
-                "source": item.get("source", "Unknown"),
+                "title": item.get("title") or "无标题动态",
+                "source": item.get("source") or "未知来源",
                 "url": item.get("url"),
-                "content": item.get("content", ""),
-                "keywords": item.get("keywords", []),
-                "relevance_score": item.get("relevance_score", 0.0),
-                "published_at": item.get("published_at") or item.get("date")
+                "content": item.get("content") or "暂无内容描述",
+                "keywords": item.get("keywords") or [],
+                "relevance_score": float(item.get("relevance_score") or 0.0),
+                "published_at": item.get("published_at") or item.get("date") or datetime.now().strftime("%Y-%m-%d")
             }
             processed_items.append(processed_item)
             
@@ -167,9 +167,12 @@ async def create_news_item(news_data: IndustryNewsCreate, db: AsyncSession = Dep
     pub_date = datetime.now()
     if news_data.published_at:
         try:
-            pub_date = datetime.fromisoformat(news_data.published_at.replace('Z', '+00:00'))
+            if 'T' in news_data.published_at:
+                pub_date = datetime.fromisoformat(news_data.published_at.replace('Z', '+00:00'))
+            else:
+                pub_date = datetime.strptime(news_data.published_at, "%Y-%m-%d")
         except:
-            pass
+            pub_date = datetime.now()
 
     news = IndustryNews(
         topic_id=news_data.topic_id,

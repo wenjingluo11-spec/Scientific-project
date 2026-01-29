@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Table, Tag, Space, Button, Modal, Form, Input, message, InputNumber, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Table, Tag, Space, Button, Modal, Form, Input, message, InputNumber, Popconfirm, Typography, Divider } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, LinkOutlined, FileSearchOutlined } from '@ant-design/icons'
 import type { RootState, AppDispatch } from '@/store/store'
 import { addCompetitor, updateCompetitor, deleteCompetitor, Competitor } from '@/store/slices/competitorsSlice'
 
 const { TextArea } = Input
+const { Text, Paragraph } = Typography
 
 interface CompetitorManagementProps {
     topicId: number | null
@@ -121,6 +122,37 @@ const CompetitorManagement: React.FC<CompetitorManagementProps> = ({ topicId }) 
                 loading={loading}
                 rowKey="id"
                 pagination={{ pageSize: 5 }}
+                expandable={{
+                    expandedRowRender: (record) => (
+                        <div style={{ padding: '16px 24px', backgroundColor: '#fafafa', borderRadius: 8 }}>
+                            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                                <div>
+                                    <Text strong><FileSearchOutlined /> 论文摘要：</Text>
+                                    <Paragraph style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{record.abstract || '暂无摘要内容'}</Paragraph>
+                                </div>
+                                {record.analysis && (
+                                    <>
+                                        <Divider style={{ margin: '8px 0' }} />
+                                        <div>
+                                            <Text strong style={{ color: '#1890ff' }}>🤖 AI 深度分析：</Text>
+                                            <Paragraph style={{ marginTop: 8, whiteSpace: 'pre-wrap', color: '#555' }}>{record.analysis}</Paragraph>
+                                        </div>
+                                    </>
+                                )}
+                                {record.url && (
+                                    <div style={{ marginTop: 8 }}>
+                                        <a href={record.url} target="_blank" rel="noopener noreferrer">
+                                            <Button type="link" icon={<LinkOutlined />} size="small" style={{ padding: 0 }}>
+                                                查阅在线原文
+                                            </Button>
+                                        </a>
+                                    </div>
+                                )}
+                            </Space>
+                        </div>
+                    ),
+                    rowExpandable: (record) => !!(record.abstract || record.analysis),
+                }}
             />
 
             <Modal

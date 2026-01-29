@@ -29,6 +29,7 @@ const CompetitorAnalysis: React.FC = () => {
 
   useEffect(() => {
     dispatch(fetchTopics())
+    dispatch(fetchCompetitors())
   }, [dispatch])
 
   const handleAIsSearch = () => {
@@ -41,8 +42,7 @@ const CompetitorAnalysis: React.FC = () => {
     try {
       await dispatch(addCompetitor({
         ...item,
-        topic_id: selectedTopicId,
-        published_at: item.date // Map 'date' from AI to 'published_at'
+        topic_id: selectedTopicId
       })).unwrap()
       message.success('已添加到竞品库')
     } catch (error) {
@@ -50,17 +50,17 @@ const CompetitorAnalysis: React.FC = () => {
     }
   }
 
+  const handleTopicChange = (value: number) => {
+    setSelectedTopicId(value)
+    dispatch({ type: 'competitors/search/fulfilled', payload: [] })
+    dispatch(fetchCompetitors(value))
+  }
+
   const handleFetchExisting = () => {
     if (selectedTopicId) {
       dispatch(fetchCompetitors(selectedTopicId))
     }
   }
-
-  useEffect(() => {
-    if (selectedTopicId) {
-      handleFetchExisting()
-    }
-  }, [selectedTopicId])
 
   const handleAnalyze = (competitorId: number) => {
     dispatch(analyzeCompetitor(competitorId))
@@ -79,10 +79,8 @@ const CompetitorAnalysis: React.FC = () => {
           <Select
             style={{ width: 400 }}
             placeholder="请选择一个研究选题"
-            onChange={(value) => {
-              setSelectedTopicId(value)
-              dispatch({ type: 'competitors/search/fulfilled', payload: [] })
-            }}
+            onChange={handleTopicChange}
+
             value={selectedTopicId}
           >
             {topics.map((topic) => (
@@ -140,7 +138,7 @@ const CompetitorAnalysis: React.FC = () => {
                               <Tag color="orange">引用数: {item.citations}</Tag>
                               <Tag color="blue">来源: {item.source}</Tag>
                               <Text type="secondary">
-                                发布日期: {item.date || '-'}
+                                发布日期: {item.published_at || '-'}
                               </Text>
                             </Space>
                           </Space>

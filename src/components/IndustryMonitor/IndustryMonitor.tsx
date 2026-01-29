@@ -53,8 +53,10 @@ const IndustryMonitor: React.FC = () => {
 
   const handleTopicChange = (value: number) => {
     setSelectedTopicId(value)
-    // Clear transient search results when changing topic
-    dispatch({ type: 'industry/search/fulfilled', payload: [] })
+    // Only clear transient search results when changing topic if not currently loading
+    if (!loading) {
+      dispatch({ type: 'industry/search/fulfilled', payload: [] })
+    }
     // Fetch existing news for this topic when selected
     dispatch(fetchIndustryNews(value))
   }

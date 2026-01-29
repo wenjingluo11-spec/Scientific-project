@@ -39,10 +39,10 @@ class CompetitorResponse(BaseModel):
 class CompetitorCreate(BaseModel):
     topic_id: int
     title: str
-    authors: str
-    source: str
+    authors: Optional[str] = None
+    source: Optional[str] = None
     url: Optional[str] = None
-    abstract: str
+    abstract: Optional[str] = None
     citations: int = 0
     published_at: Optional[str] = None
 
@@ -59,9 +59,14 @@ class CompetitorUpdate(BaseModel):
 
 
 @router.get("/", response_model=List[CompetitorResponse])
-async def get_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
-    """Get competitors for a specific topic from Database"""
-    result = await db.execute(select(Competitor).where(Competitor.topic_id == topic_id))
+async def get_competitors(topic_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
+    """Get competitors, optionally filtered by topic"""
+    query = select(Competitor).order_by(Competitor.created_at.desc()).limit(50)
+    
+    if topic_id:
+        query = query.where(Competitor.topic_id == topic_id)
+        
+    result = await db.execute(query)
     competitors = result.scalars().all()
     return [comp.to_dict() for comp in competitors]
 
@@ -143,17 +148,18 @@ async def search_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
         data = json.loads(json_str)
         papers = data.get("papers", [])
         
-        # Map fields (especially 'date' -> 'published_at')
+        # Map fields (especially 'date' -> 'published_at') and handle potential None values
         processed_papers = []
         for p in papers:
             processed_paper = {
-                "title": p.get("title", "Untitled"),
-                "authors": p.get("authors", "Unknown"),
-                "source": p.get("source", "Unknown"),
+                "title": p.get("title") or "未命名论文",
+                "authors": p.get("authors") or "不详",
+                "source": p.get("source") or "未知渠道",
                 "url": p.get("url"),
-                "abstract": p.get("abstract", ""),
-                "citations": p.get("citations", 0),
-                "published_at": p.get("published_at") or p.get("date")
+                "abstract": p.get("abstract") or "暂无摘要",
+                "citations": int(p.get("citations") or 0),
+                "published_at": p.get("published_at") or p.get("date") or datetime.now().strftime("%Y-%m-%d"),
+                "analysis": p.get("analysis")
             }
             processed_papers.append(processed_paper)
             
@@ -225,9 +231,15 @@ async def create_competitor(comp_data: CompetitorCreate, db: AsyncSession = Depe
     pub_date = datetime.now()
     if comp_data.published_at:
         try:
-            pub_date = datetime.fromisoformat(comp_data.published_at.replace('Z', '+00:00'))
+            # Try ISO format first
+            if 'T' in comp_data.published_at:
+                pub_date = datetime.fromisoformat(comp_data.published_at.replace('Z', '+00:00'))
+            else:
+                # Try YYYY-MM-DD
+                pub_date = datetime.strptime(comp_data.published_at, "%Y-%m-%d")
         except:
-            pass
+            # Fallback to current time if parsing fails
+            pub_date = datetime.now()
 
     competitor = Competitor(
         topic_id=comp_data.topic_id,

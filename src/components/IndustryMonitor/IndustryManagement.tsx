@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Table, Tag, Space, Button, Modal, Form, Input, message, InputNumber, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Table, Tag, Space, Button, Modal, Form, Input, message, InputNumber, Popconfirm, Typography } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, LinkOutlined } from '@ant-design/icons'
 import type { RootState, AppDispatch } from '@/store/store'
 import { addIndustryNews, updateIndustryNews, deleteIndustryNews, IndustryNews } from '@/store/slices/industrySlice'
 
 const { TextArea } = Input
+const { Text, Paragraph } = Typography
 
 interface IndustryManagementProps {
     topicId: number | null
@@ -124,6 +125,24 @@ const IndustryManagement: React.FC<IndustryManagementProps> = ({ topicId }) => {
                 loading={loading}
                 rowKey="id"
                 pagination={{ pageSize: 5 }}
+                expandable={{
+                    expandedRowRender: (record) => (
+                        <div style={{ padding: '8px 24px', backgroundColor: '#fafafa', borderRadius: 4 }}>
+                            <Text strong>动态摘要：</Text>
+                            <Paragraph style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{record.content}</Paragraph>
+                            {record.url && (
+                                <div style={{ marginTop: 8 }}>
+                                    <a href={record.url} target="_blank" rel="noopener noreferrer">
+                                        <Button type="link" icon={<LinkOutlined />} size="small" style={{ padding: 0 }}>
+                                            查看原文链接
+                                        </Button>
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    ),
+                    rowExpandable: (record) => !!record.content,
+                }}
             />
 
             <Modal
