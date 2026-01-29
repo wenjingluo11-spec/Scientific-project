@@ -14,8 +14,19 @@ import re
 router = APIRouter()
 
 
+class IndustryNewsSearchItem(BaseModel):
+    title: str
+    source: str
+    url: Optional[str]
+    content: str
+    keywords: List[str]
+    relevance_score: float
+    published_at: Optional[str]
+
+
 class IndustryNewsResponse(BaseModel):
-    id: int
+    id: Optional[int] = None
+    topic_id: Optional[int]
     title: str
     source: str
     url: Optional[str]
@@ -24,6 +35,27 @@ class IndustryNewsResponse(BaseModel):
     relevance_score: float
     published_at: Optional[str]
     created_at: str
+
+
+class IndustryNewsCreate(BaseModel):
+    topic_id: Optional[int] = None
+    title: str
+    source: str
+    url: Optional[str] = None
+    content: str
+    keywords: List[str] = []
+    relevance_score: float = 0.0
+    published_at: Optional[str] = None
+
+
+class IndustryNewsUpdate(BaseModel):
+    title: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
+    content: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    relevance_score: Optional[float] = None
+    published_at: Optional[str] = None
 
 
 @router.get("/news", response_model=List[IndustryNewsResponse])
@@ -39,9 +71,9 @@ async def get_industry_news(topic_id: Optional[int] = None, db: AsyncSession = D
     return [news.to_dict() for news in news_list]
 
 
-@router.post("/refresh", response_model=List[IndustryNewsResponse])
-async def refresh_industry_news(topic_id: int, db: AsyncSession = Depends(get_db)):
-    """Refresh industry news for a specific topic using AI"""
+@router.post("/search", response_model=List[IndustryNewsSearchItem])
+async def search_industry_news(topic_id: int, db: AsyncSession = Depends(get_db)):
+    """Search industry news for a specific topic using AI (Returns transient results)"""
 
     # 1. Get Topic Details
     result = await db.execute(select(Topic).where(Topic.id == topic_id))
@@ -50,11 +82,7 @@ async def refresh_industry_news(topic_id: int, db: AsyncSession = Depends(get_db
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    # 2. Force Refresh: Delete old news for this topic
-    await db.execute(delete(IndustryNews).where(IndustryNews.topic_id == topic_id))
-    await db.commit()
-
-    # 3. Call AI to search industry news
+    # 2. Call AI to search industry news
     client = AnthropicClient()
 
     # Parse keywords
@@ -78,7 +106,7 @@ async def refresh_industry_news(topic_id: int, db: AsyncSession = Depends(get_db
             task=task
         )
 
-        # 4. Parse JSON
+        # 3. Parse JSON
         json_str = response_text.strip()
         if "```json" in json_str:
             match = re.search(r"```json(.*?)```", json_str, re.DOTALL)
@@ -91,45 +119,19 @@ async def refresh_industry_news(topic_id: int, db: AsyncSession = Depends(get_db
 
         data = json.loads(json_str)
         news_items = data.get("news", [])
-
-        news_objects = []
-        for item in news_items:
-            # Handle date parsing
-            pub_date = datetime.now()
-            try:
-                if "date" in item and item["date"]:
-                    pub_date = datetime.strptime(item["date"], "%Y-%m-%d")
-            except:
-                pass
-            
-            # Handle keywords list to JSON string
-            keywords_json = "[]"
-            if "keywords" in item:
-                 keywords_json = json.dumps(item["keywords"], ensure_ascii=False)
-
-            news = IndustryNews(
-                topic_id=topic_id,
-                title=item.get("title", "Unknown Title"),
-                source=item.get("source", "Unknown Source"),
-                url=item.get("url", ""),
-                content=item.get("content", "No content available."),
-                keywords=keywords_json,
-                relevance_score=item.get("relevance_score", 0.0),
-                published_at=pub_date
-            )
-            db.add(news)
-            news_objects.append(news)
-
-        await db.commit()
-
-        for news in news_objects:
-            await db.refresh(news)
-
-        return [news.to_dict() for news in news_objects]
+        return news_items
 
     except Exception as e:
         print(f"Error in Industry AI Search: {e}")
         raise HTTPException(status_code=500, detail=f"AI Search Failed: {str(e)}")
+
+
+@router.post("/refresh", response_model=List[IndustryNewsResponse])
+async def refresh_industry_news(topic_id: int, db: AsyncSession = Depends(get_db)):
+    """Keep for backward compatibility, but this implementation will now use search and NOT save automatically if preferred, 
+    but for now let's keep it as is or change to match the new 'transient' requirement."""
+    # Actually, let's just use /search from the frontend.
+    return await search_industry_news(topic_id, db)
 
 
 @router.get("/news/{news_id}", response_model=IndustryNewsResponse)
@@ -142,3 +144,73 @@ async def get_news_item(news_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="News not found")
 
     return news.to_dict()
+
+
+@router.post("/", response_model=IndustryNewsResponse)
+async def create_news_item(news_data: IndustryNewsCreate, db: AsyncSession = Depends(get_db)):
+    """Create a news item manually"""
+    pub_date = datetime.now()
+    if news_data.published_at:
+        try:
+            pub_date = datetime.fromisoformat(news_data.published_at.replace('Z', '+00:00'))
+        except:
+            pass
+
+    news = IndustryNews(
+        topic_id=news_data.topic_id,
+        title=news_data.title,
+        source=news_data.source,
+        url=news_data.url,
+        content=news_data.content,
+        keywords=json.dumps(news_data.keywords, ensure_ascii=False),
+        relevance_score=news_data.relevance_score,
+        published_at=pub_date
+    )
+    db.add(news)
+    await db.commit()
+    await db.refresh(news)
+    return news.to_dict()
+
+
+@router.put("/{news_id}", response_model=IndustryNewsResponse)
+async def update_news_item(news_id: int, news_data: IndustryNewsUpdate, db: AsyncSession = Depends(get_db)):
+    """Update a news item"""
+    result = await db.execute(select(IndustryNews).where(IndustryNews.id == news_id))
+    news = result.scalar_one_or_none()
+
+    if not news:
+        raise HTTPException(status_code=404, detail="News not found")
+
+    update_data = news_data.dict(exclude_unset=True)
+    
+    if "keywords" in update_data:
+        news.keywords = json.dumps(update_data["keywords"], ensure_ascii=False)
+        del update_data["keywords"]
+    
+    if "published_at" in update_data and update_data["published_at"]:
+        try:
+            news.published_at = datetime.fromisoformat(update_data["published_at"].replace('Z', '+00:00'))
+            del update_data["published_at"]
+        except:
+            pass
+
+    for key, value in update_data.items():
+        setattr(news, key, value)
+
+    await db.commit()
+    await db.refresh(news)
+    return news.to_dict()
+
+
+@router.delete("/{news_id}")
+async def delete_news_item(news_id: int, db: AsyncSession = Depends(get_db)):
+    """Delete a news item"""
+    result = await db.execute(select(IndustryNews).where(IndustryNews.id == news_id))
+    news = result.scalar_one_or_none()
+
+    if not news:
+        raise HTTPException(status_code=404, detail="News not found")
+
+    await db.delete(news)
+    await db.commit()
+    return {"message": "News deleted successfully"}

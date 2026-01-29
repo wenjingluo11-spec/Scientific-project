@@ -17,12 +17,14 @@ export interface Competitor {
 
 interface CompetitorsState {
   competitors: Competitor[]
+  searchResults: any[]
   loading: boolean
   error: string | null
 }
 
 const initialState: CompetitorsState = {
   competitors: [],
+  searchResults: [],
   loading: false,
   error: null,
 }
@@ -30,7 +32,15 @@ const initialState: CompetitorsState = {
 export const fetchCompetitors = createAsyncThunk(
   'competitors/fetch',
   async (topicId: number) => {
-    const response = await api.get(`/api/v1/competitors?topic_id=${topicId}`)
+    const response = await api.get(`/api/v1/competitors/?topic_id=${topicId}`)
+    return response.data
+  }
+)
+
+export const searchCompetitors = createAsyncThunk(
+  'competitors/search',
+  async (topicId: number) => {
+    const response = await api.post(`/api/v1/competitors/search?topic_id=${topicId}`)
     return response.data
   }
 )
@@ -40,6 +50,30 @@ export const analyzeCompetitor = createAsyncThunk(
   async (competitorId: number) => {
     const response = await api.post(`/api/v1/competitors/${competitorId}/analyze`)
     return response.data
+  }
+)
+
+export const addCompetitor = createAsyncThunk(
+  'competitors/add',
+  async (compData: Partial<Competitor>) => {
+    const response = await api.post('/api/v1/competitors/', compData)
+    return response.data
+  }
+)
+
+export const updateCompetitor = createAsyncThunk(
+  'competitors/update',
+  async ({ id, data }: { id: number; data: Partial<Competitor> }) => {
+    const response = await api.put(`/api/v1/competitors/${id}`, data)
+    return response.data
+  }
+)
+
+export const deleteCompetitor = createAsyncThunk(
+  'competitors/delete',
+  async (id: number) => {
+    await api.delete(`/api/v1/competitors/${id}`)
+    return id
   }
 )
 
@@ -56,9 +90,16 @@ const competitorsSlice = createSlice({
         state.loading = false
         state.competitors = action.payload
       })
-      .addCase(fetchCompetitors.rejected, (state, action) => {
+      .addCase(searchCompetitors.pending, (state) => {
+        state.loading = true
+      })
+      .addCase(searchCompetitors.fulfilled, (state, action) => {
         state.loading = false
-        state.error = action.error.message || 'Failed to fetch competitors'
+        state.searchResults = action.payload
+      })
+      .addCase(searchCompetitors.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.error.message || 'Failed to search competitors'
       })
       .addCase(analyzeCompetitor.pending, (state) => {
         // Optional: could add specific loading state per item if needed
@@ -69,6 +110,18 @@ const competitorsSlice = createSlice({
         if (index !== -1) {
           state.competitors[index] = action.payload
         }
+      })
+      .addCase(addCompetitor.fulfilled, (state, action) => {
+        state.competitors.unshift(action.payload)
+      })
+      .addCase(updateCompetitor.fulfilled, (state, action) => {
+        const index = state.competitors.findIndex((c) => c.id === action.payload.id)
+        if (index !== -1) {
+          state.competitors[index] = action.payload
+        }
+      })
+      .addCase(deleteCompetitor.fulfilled, (state, action) => {
+        state.competitors = state.competitors.filter((c) => c.id !== action.payload)
       })
   },
 })
