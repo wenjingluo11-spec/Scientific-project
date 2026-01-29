@@ -167,6 +167,14 @@ const IndustryMonitor: React.FC = () => {
                               <ClockCircleOutlined /> 来源: {item.source} | 发布时间:{' '}
                               {dateToLocaleString(item.published_at)}
                             </Text>
+                            {/* Display Model Signature */}
+                            {item.model_signature && (
+                                <div style={{ marginTop: 4, textAlign: 'right' }}>
+                                    <Tag color="default" style={{ color: '#999', fontSize: 10, border: 'none', background: 'transparent', margin: 0 }}>
+                                    {item.model_signature.replace(/-- | --/g, '')}
+                                    </Tag>
+                                </div>
+                            )}
                           </div>
                         </Card>
                       </List.Item>

@@ -13,6 +13,7 @@ class Topic(Base):
     field = Column(String(100))
     keywords = Column(Text)  # JSON string
     status = Column(String(20), default="pending")  # pending/processing/completed
+    model_signature = Column(String(100), nullable=True)  # New column
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
@@ -24,6 +25,7 @@ class Topic(Base):
             "field": self.field,
             "keywords": json.loads(self.keywords) if self.keywords else [],
             "status": self.status,
+            "model_signature": self.model_signature,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

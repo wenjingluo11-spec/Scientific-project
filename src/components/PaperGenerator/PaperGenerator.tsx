@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Card, Steps, Button, Progress, Space, Typography, Divider, message, Select, Tabs } from 'antd'
-import { RobotOutlined, FileTextOutlined, DownloadOutlined, HistoryOutlined, PlusOutlined } from '@ant-design/icons'
+import { RobotOutlined, FileTextOutlined, DownloadOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import type { RootState, AppDispatch } from '@/store/store'
 import { generatePaper, resetAgentProgress, fetchPapers } from '@/store/slices/papersSlice'
 import { fetchTopics } from '@/store/slices/topicsSlice'
 import { websocketService } from '@/services/websocket'
 import PaperHistory from './PaperHistory'
+import PaperTrace from './PaperTrace'
 
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
@@ -205,6 +206,20 @@ const PaperGenerator: React.FC = () => {
                   </Card>
                 )}
               </>
+            ),
+          },
+          {
+            key: 'trace',
+            label: (
+              <span>
+                <PlayCircleOutlined />
+                生成过程回放
+              </span>
+            ),
+            children: (
+              <Card>
+                <PaperTrace paperId={currentPaper?.id || null} />
+              </Card>
             ),
           },
           {

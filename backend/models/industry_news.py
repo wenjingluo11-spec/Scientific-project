@@ -16,6 +16,7 @@ class IndustryNews(Base):
     keywords = Column(Text)  # JSON string
     relevance_score = Column(Float, default=0.0)
     published_at = Column(DateTime(timezone=True))
+    model_signature = Column(String(100), nullable=True) # New column
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def to_dict(self):
@@ -29,5 +30,6 @@ class IndustryNews(Base):
             "keywords": json.loads(self.keywords) if self.keywords else [],
             "relevance_score": self.relevance_score,
             "published_at": self.published_at.isoformat() if self.published_at else None,
+            "model_signature": self.model_signature,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

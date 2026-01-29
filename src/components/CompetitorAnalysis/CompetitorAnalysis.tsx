@@ -166,6 +166,14 @@ const CompetitorAnalysis: React.FC = () => {
                         <Paragraph ellipsis={{ rows: 2, expandable: true }}>
                           <Text strong>摘要：</Text> {item.abstract}
                         </Paragraph>
+                        {/* Display Model Signature */}
+                        {item.model_signature && (
+                            <div style={{ marginTop: 8, textAlign: 'right' }}>
+                                <Tag color="default" style={{ color: '#999', fontSize: 10, border: 'none', background: 'transparent', margin: 0 }}>
+                                    {item.model_signature.replace(/-- | --/g, '')}
+                                </Tag>
+                            </div>
+                        )}
                       </Card>
                     </List.Item>
                   )}

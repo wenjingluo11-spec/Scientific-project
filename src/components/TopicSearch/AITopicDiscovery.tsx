@@ -253,6 +253,15 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
                       {suggestion.reasoning}
                     </div>
                   </div>
+
+                  {/* Display Model Signature */}
+                  {suggestion.model_signature && (
+                     <div style={{ marginTop: 12, textAlign: 'right' }}>
+                       <Tag color="default" style={{ color: '#999', fontSize: 12, border: 'none', background: 'transparent' }}>
+                         {suggestion.model_signature}
+                       </Tag>
+                     </div>
+                  )}
                 </Card>
               ))}
             </Space>

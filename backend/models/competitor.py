@@ -16,6 +16,7 @@ class Competitor(Base):
     citations = Column(Integer, default=0)
     published_at = Column(DateTime(timezone=True))
     analysis = Column(Text)  # AI analysis result
+    model_signature = Column(String(100), nullable=True) # New column
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def to_dict(self):
@@ -30,5 +31,6 @@ class Competitor(Base):
             "citations": self.citations,
             "published_at": self.published_at.isoformat() if self.published_at else None,
             "analysis": self.analysis,
+            "model_signature": self.model_signature,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

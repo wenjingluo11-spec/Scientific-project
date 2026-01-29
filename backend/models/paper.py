@@ -38,6 +38,12 @@ class AgentConversation(Base):
     agent_role = Column(String(50))
     message = Column(Text)
     iteration = Column(Integer, default=1)
+
+    # New columns for traceability
+    model_signature = Column(String(100), nullable=True)
+    step_name = Column(String(100), nullable=True)
+    input_context = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def to_dict(self):
@@ -47,5 +53,8 @@ class AgentConversation(Base):
             "agent_role": self.agent_role,
             "message": self.message,
             "iteration": self.iteration,
+            "model_signature": self.model_signature,
+            "step_name": self.step_name,
+            "input_context": self.input_context,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

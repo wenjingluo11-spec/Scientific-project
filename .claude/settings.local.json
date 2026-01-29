@@ -3,7 +3,8 @@
     "allow": [
       "Bash(taskkill:*)",
       "Bash(ping:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(python3:*)"
     ],
     "additionalDirectories": [
       "f:\\Scientific project"

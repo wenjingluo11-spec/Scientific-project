@@ -12,6 +12,7 @@ export interface Competitor {
   citations: number
   published_at: string
   analysis: string
+  model_signature?: string // Added
   created_at: string
 }
 

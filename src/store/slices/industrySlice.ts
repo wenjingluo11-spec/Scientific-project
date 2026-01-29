@@ -10,6 +10,7 @@ export interface IndustryNews {
   keywords: string[]
   relevance_score: number
   published_at: string
+  model_signature?: string // Added
   created_at: string
 }
 

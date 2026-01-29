@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Agent Settings
     MAX_ITERATIONS: int = 3
     DEFAULT_MODEL: str = "claude-haiku-4-5"  # 与旧项目一致
-    MAX_TOKENS: int = 4096  # 增加到 4096，与旧项目一致
+    MAX_TOKENS: int = 20000  # 增加到 4096，与旧项目一致
     API_TIMEOUT: int = 120  # 与旧项目一致
 
     # Web Scraping

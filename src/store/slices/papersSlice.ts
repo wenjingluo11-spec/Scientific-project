@@ -20,12 +20,25 @@ export interface AgentProgress {
   progress: number
 }
 
+export interface PaperTraceItem {
+  id: number
+  step_name: string
+  agent_role: string
+  model_signature: string
+  input_context: string
+  output_content: string
+  iteration: number
+  created_at: string
+}
+
 interface PapersState {
   papers: Paper[]
   currentPaper: Paper | null
   agentProgress: AgentProgress[]
+  paperTrace: PaperTraceItem[] // Added
   loading: boolean
   generating: boolean
+  traceLoading: boolean // Added
   error: string | null
 }
 
@@ -33,10 +46,20 @@ const initialState: PapersState = {
   papers: [],
   currentPaper: null,
   agentProgress: [],
+  paperTrace: [], // Added
   loading: false,
   generating: false,
+  traceLoading: false, // Added
   error: null,
 }
+
+export const fetchPaperTrace = createAsyncThunk(
+  'papers/fetchPaperTrace',
+  async (paperId: number) => {
+    const response = await api.get(`/api/v1/papers/${paperId}/trace`)
+    return response.data
+  }
+)
 
 export const generatePaper = createAsyncThunk(
   'papers/generatePaper',
@@ -125,6 +148,16 @@ const papersSlice = createSlice({
         if (state.currentPaper?.id === action.payload) {
           state.currentPaper = null
         }
+      })
+      .addCase(fetchPaperTrace.pending, (state) => {
+        state.traceLoading = true
+      })
+      .addCase(fetchPaperTrace.fulfilled, (state, action) => {
+        state.paperTrace = action.payload
+        state.traceLoading = false
+      })
+      .addCase(fetchPaperTrace.rejected, (state) => {
+        state.traceLoading = false
       })
   },
 })

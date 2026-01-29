@@ -20,6 +20,7 @@ export interface TopicSuggestion {
   novelty_score: number
   feasibility_score: number
   reasoning: string
+  model_signature?: string // Added
 }
 
 export interface RecommendationHistory {
@@ -34,6 +35,7 @@ export interface RecommendationHistory {
 export interface DiscoveryResponse {
   suggestions: TopicSuggestion[]
   recommendation_id?: number
+  model_signature?: string // Added
 }
 
 interface TopicsState {
@@ -149,7 +151,16 @@ const topicsSlice = createSlice({
       })
       .addCase(discoverTopics.fulfilled, (state, action) => {
         state.discovering = false
-        state.suggestions = action.payload.suggestions
+        // Inject model_signature into suggestions if present in payload
+        const signature = (action.payload as any).model_signature
+        if (signature) {
+            state.suggestions = action.payload.suggestions.map((s: TopicSuggestion) => ({
+                ...s,
+                model_signature: signature
+            }))
+        } else {
+            state.suggestions = action.payload.suggestions
+        }
       })
       .addCase(discoverTopics.rejected, (state, action) => {
         state.discovering = false

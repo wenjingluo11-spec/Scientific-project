@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.database import get_db, async_session_maker
-from models.paper import Paper
+from models.paper import Paper, AgentConversation
 from models.topic import Topic
 from services.orchestrator import AgentOrchestrator
 from pydantic import BaseModel
@@ -23,6 +23,16 @@ class PaperResponse(BaseModel):
     version: int
     status: str
     quality_score: float
+    created_at: str
+
+class PaperTraceItem(BaseModel):
+    id: int
+    step_name: Optional[str]
+    agent_role: str
+    model_signature: Optional[str]
+    input_context: Optional[str]
+    output_content: str
+    iteration: int
     created_at: str
 
 class ConnectionManager:
@@ -91,6 +101,38 @@ async def get_paper(paper_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Paper not found")
 
     return paper.to_dict()
+
+@router.get("/{paper_id}/trace", response_model=List[PaperTraceItem])
+async def get_paper_trace(paper_id: int, db: AsyncSession = Depends(get_db)):
+    """Get full generation trace for a paper (audit log)"""
+    # 1. Check paper exists
+    result = await db.execute(select(Paper).where(Paper.id == paper_id))
+    paper = result.scalar_one_or_none()
+
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    # 2. Get history
+    result = await db.execute(
+        select(AgentConversation)
+        .where(AgentConversation.paper_id == paper_id)
+        .order_by(AgentConversation.id.asc())
+    )
+    conversations = result.scalars().all()
+
+    return [
+        {
+            "id": c.id,
+            "step_name": c.step_name,
+            "agent_role": c.agent_role,
+            "model_signature": c.model_signature,
+            "input_context": c.input_context,
+            "output_content": c.message,
+            "iteration": c.iteration,
+            "created_at": c.created_at.isoformat() if c.created_at else None
+        }
+        for c in conversations
+    ]
 
 @router.post("/generate", response_model=PaperResponse)
 async def generate_paper(

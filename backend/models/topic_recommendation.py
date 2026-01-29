@@ -13,6 +13,7 @@ class TopicRecommendation(Base):
     keywords = Column(Text, nullable=False)  # JSON string
     description = Column(Text, nullable=True)
     suggestions = Column(Text, nullable=False)  # JSON string of all suggestions
+    model_signature = Column(String(100), nullable=True) # New column
     created_at = Column(DateTime, server_default=func.now())
 
     def to_dict(self):
@@ -22,5 +23,6 @@ class TopicRecommendation(Base):
             "keywords": json_lib.loads(self.keywords) if self.keywords else [],
             "description": self.description,
             "suggestions": json_lib.loads(self.suggestions) if self.suggestions else [],
+            "model_signature": self.model_signature,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
