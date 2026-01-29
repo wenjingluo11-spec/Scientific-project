@@ -15,12 +15,14 @@ export interface IndustryNews {
 
 interface IndustryState {
   news: IndustryNews[]
+  searchResults: any[]
   loading: boolean
   error: string | null
 }
 
 const initialState: IndustryState = {
   news: [],
+  searchResults: [],
   loading: false,
   error: null,
 }
@@ -34,11 +36,35 @@ export const fetchIndustryNews = createAsyncThunk(
   }
 )
 
-export const refreshIndustryNews = createAsyncThunk(
-  'industry/refresh',
+export const searchIndustryNews = createAsyncThunk(
+  'industry/search',
   async (topicId: number) => {
-    const response = await api.post(`/api/v1/industry/refresh?topic_id=${topicId}`)
+    const response = await api.post(`/api/v1/industry/search?topic_id=${topicId}`)
     return response.data
+  }
+)
+
+export const addIndustryNews = createAsyncThunk(
+  'industry/add',
+  async (newsData: Partial<IndustryNews>) => {
+    const response = await api.post('/api/v1/industry/', newsData)
+    return response.data
+  }
+)
+
+export const updateIndustryNews = createAsyncThunk(
+  'industry/update',
+  async ({ id, data }: { id: number; data: Partial<IndustryNews> }) => {
+    const response = await api.put(`/api/v1/industry/${id}`, data)
+    return response.data
+  }
+)
+
+export const deleteIndustryNews = createAsyncThunk(
+  'industry/delete',
+  async (id: number) => {
+    await api.delete(`/api/v1/industry/${id}`)
+    return id
   }
 )
 
@@ -59,17 +85,29 @@ const industrySlice = createSlice({
         state.loading = false
         state.error = action.error.message || 'Failed to fetch news'
       })
-      .addCase(refreshIndustryNews.pending, (state) => {
+      .addCase(searchIndustryNews.pending, (state) => {
         state.loading = true
         state.error = null
       })
-      .addCase(refreshIndustryNews.fulfilled, (state, action) => {
+      .addCase(searchIndustryNews.fulfilled, (state, action) => {
         state.loading = false
-        state.news = action.payload
+        state.searchResults = action.payload
       })
-      .addCase(refreshIndustryNews.rejected, (state, action) => {
+      .addCase(searchIndustryNews.rejected, (state, action) => {
         state.loading = false
-        state.error = action.error.message || 'Failed to refresh news'
+        state.error = action.error.message || 'Failed to search news'
+      })
+      .addCase(addIndustryNews.fulfilled, (state, action) => {
+        state.news.unshift(action.payload)
+      })
+      .addCase(updateIndustryNews.fulfilled, (state, action) => {
+        const index = state.news.findIndex((n) => n.id === action.payload.id)
+        if (index !== -1) {
+          state.news[index] = action.payload
+        }
+      })
+      .addCase(deleteIndustryNews.fulfilled, (state, action) => {
+        state.news = state.news.filter((n) => n.id !== action.payload)
       })
   },
 })

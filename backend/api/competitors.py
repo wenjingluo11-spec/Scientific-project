@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.database import get_db
-from models.database import get_db
 from models.competitor import Competitor
 from models.topic import Topic
 from utils.anthropic_client import AnthropicClient
@@ -13,23 +12,68 @@ from datetime import datetime
 router = APIRouter()
 
 
+class CompetitorSearchItem(BaseModel):
+    title: str
+    authors: str
+    source: str
+    url: Optional[str] = None
+    abstract: str
+    citations: int = 0
+    published_at: Optional[str] = None
+
+
 class CompetitorResponse(BaseModel):
-    id: int
+    id: Optional[int] = None
     topic_id: int
     title: str
     authors: str
     source: str
-    url: Optional[str]
+    url: Optional[str] = None
     abstract: str
-    citations: int
-    published_at: Optional[str]
-    analysis: Optional[str]
+    citations: int = 0
+    published_at: Optional[str] = None
+    analysis: Optional[str] = None
     created_at: str
 
 
+class CompetitorCreate(BaseModel):
+    topic_id: int
+    title: str
+    authors: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
+    abstract: Optional[str] = None
+    citations: int = 0
+    published_at: Optional[str] = None
+
+
+class CompetitorUpdate(BaseModel):
+    title: Optional[str] = None
+    authors: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
+    abstract: Optional[str] = None
+    citations: Optional[int] = None
+    published_at: Optional[str] = None
+    analysis: Optional[str] = None
+
+
 @router.get("/", response_model=List[CompetitorResponse])
-async def get_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
-    """Get competitors for a specific topic using AI Search"""
+async def get_competitors(topic_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
+    """Get competitors, optionally filtered by topic"""
+    query = select(Competitor).order_by(Competitor.created_at.desc()).limit(50)
+    
+    if topic_id:
+        query = query.where(Competitor.topic_id == topic_id)
+        
+    result = await db.execute(query)
+    competitors = result.scalars().all()
+    return [comp.to_dict() for comp in competitors]
+
+
+@router.post("/search", response_model=List[CompetitorSearchItem])
+async def search_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
+    """Search competitors for a specific topic using AI (Returns transient results)"""
 
     # 1. Get Topic Details
     result = await db.execute(select(Topic).where(Topic.id == topic_id))
@@ -38,13 +82,7 @@ async def get_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    # 2. Force Refresh: Delete old competitors for this topic to ensure real-time search
-    # User requested: "查找每一个选题都是实时搜索得到的... 不要根据关键词"
-    from sqlalchemy import delete
-    await db.execute(delete(Competitor).where(Competitor.topic_id == topic_id))
-    await db.commit()
-    
-    # 3. Call AI to search papers
+    # 2. Call AI to search papers
     client = AnthropicClient()
     
     # Parse keywords (stored as JSON string)
@@ -68,8 +106,22 @@ async def get_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
 2. **实时搜索/回忆**：请寻找与该特定选题最相关的竞品论文（或高度相关的经典参考文献）。
 3. **真实性**：请尽量提供真实的论文、作者和来源。如果无法连接外部数据库，请基于你的大规模知识库提供准确的经典论文。
 4. **数量**：推荐 5 篇最相关的论文。
+5. **JSON 格式**：请严格按照 JSON 格式返回。
 
-请确保推荐的论文确实解决了与该选题类似的问题，而不仅仅是领域相同。"""
+输出格式要求（严格 JSON）：
+{
+  "papers": [
+    {
+      "title": "论文标题",
+      "authors": "作者列表",
+      "source": "发表来源 (Journal/Conference/arXiv)",
+      "date": "发表日期 (YYYY-MM-DD)",
+      "citations": 120,
+      "abstract": "摘要内容 (100-200字)",
+      "url": "论文链接 (如果有)"
+    }
+  ]
+}"""
 
     try:
         response_text = await client.create_message(
@@ -78,7 +130,7 @@ async def get_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
             task=task
         )
         
-        # 4. Parse JSON
+        # 3. Parse JSON
         import json
         import re
         
@@ -95,40 +147,26 @@ async def get_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
 
         data = json.loads(json_str)
         papers = data.get("papers", [])
-
-        competitors = []
+        
+        # Map fields (especially 'date' -> 'published_at') and handle potential None values
+        processed_papers = []
         for p in papers:
-            # Handle date parsing looseness
-            pub_date = datetime.now()
-            try:
-                if "date" in p and p["date"]:
-                    pub_date = datetime.strptime(p["date"], "%Y-%m-%d")
-            except:
-                pass
-
-            competitor = Competitor(
-                topic_id=topic_id,
-                title=p.get("title", "Unknown Title"),
-                authors=p.get("authors", "Unknown Authors"),
-                source=p.get("source", "Unknown Source"),
-                url=p.get("url", ""),
-                abstract=p.get("abstract", "No abstract available."),
-                citations=p.get("citations", 0),
-                published_at=pub_date
-            )
-            db.add(competitor)
-            competitors.append(competitor)
-        
-        await db.commit()
-        
-        for comp in competitors:
-            await db.refresh(comp)
+            processed_paper = {
+                "title": p.get("title") or "未命名论文",
+                "authors": p.get("authors") or "不详",
+                "source": p.get("source") or "未知渠道",
+                "url": p.get("url"),
+                "abstract": p.get("abstract") or "暂无摘要",
+                "citations": int(p.get("citations") or 0),
+                "published_at": p.get("published_at") or p.get("date") or datetime.now().strftime("%Y-%m-%d"),
+                "analysis": p.get("analysis")
+            }
+            processed_papers.append(processed_paper)
             
-        return [comp.to_dict() for comp in competitors]
+        return processed_papers
 
     except Exception as e:
         print(f"Error in AI Competitor Search: {e}")
-        # Build a fallback error object or raise
         raise HTTPException(status_code=500, detail=f"AI Search Failed: {str(e)}")
 
 
@@ -185,3 +223,75 @@ async def get_competitor(competitor_id: int, db: AsyncSession = Depends(get_db))
         raise HTTPException(status_code=404, detail="Competitor not found")
 
     return competitor.to_dict()
+
+
+@router.post("/", response_model=CompetitorResponse)
+async def create_competitor(comp_data: CompetitorCreate, db: AsyncSession = Depends(get_db)):
+    """Create a competitor manually"""
+    pub_date = datetime.now()
+    if comp_data.published_at:
+        try:
+            # Try ISO format first
+            if 'T' in comp_data.published_at:
+                pub_date = datetime.fromisoformat(comp_data.published_at.replace('Z', '+00:00'))
+            else:
+                # Try YYYY-MM-DD
+                pub_date = datetime.strptime(comp_data.published_at, "%Y-%m-%d")
+        except:
+            # Fallback to current time if parsing fails
+            pub_date = datetime.now()
+
+    competitor = Competitor(
+        topic_id=comp_data.topic_id,
+        title=comp_data.title,
+        authors=comp_data.authors,
+        source=comp_data.source,
+        url=comp_data.url,
+        abstract=comp_data.abstract,
+        citations=comp_data.citations,
+        published_at=pub_date
+    )
+    db.add(competitor)
+    await db.commit()
+    await db.refresh(competitor)
+    return competitor.to_dict()
+
+
+@router.put("/{competitor_id}", response_model=CompetitorResponse)
+async def update_competitor(competitor_id: int, comp_data: CompetitorUpdate, db: AsyncSession = Depends(get_db)):
+    """Update a competitor"""
+    result = await db.execute(select(Competitor).where(Competitor.id == competitor_id))
+    competitor = result.scalar_one_or_none()
+
+    if not competitor:
+        raise HTTPException(status_code=404, detail="Competitor not found")
+
+    update_data = comp_data.dict(exclude_unset=True)
+    
+    if "published_at" in update_data and update_data["published_at"]:
+        try:
+            competitor.published_at = datetime.fromisoformat(update_data["published_at"].replace('Z', '+00:00'))
+            del update_data["published_at"]
+        except:
+            pass
+
+    for key, value in update_data.items():
+        setattr(competitor, key, value)
+
+    await db.commit()
+    await db.refresh(competitor)
+    return competitor.to_dict()
+
+
+@router.delete("/{competitor_id}")
+async def delete_competitor(competitor_id: int, db: AsyncSession = Depends(get_db)):
+    """Delete a competitor"""
+    result = await db.execute(select(Competitor).where(Competitor.id == competitor_id))
+    competitor = result.scalar_one_or_none()
+
+    if not competitor:
+        raise HTTPException(status_code=404, detail="Competitor not found")
+
+    await db.delete(competitor)
+    await db.commit()
+    return {"message": "Competitor deleted successfully"}

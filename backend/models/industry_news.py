@@ -21,6 +21,7 @@ class IndustryNews(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "topic_id": self.topic_id,
             "title": self.title,
             "source": self.source,
             "url": self.url,

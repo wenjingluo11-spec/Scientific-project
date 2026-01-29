@@ -51,11 +51,33 @@ export const fetchPapers = createAsyncThunk('papers/fetchPapers', async () => {
   return response.data
 })
 
+export const fetchPaperById = createAsyncThunk(
+  'papers/fetchPaperById',
+  async (paperId: number) => {
+    const response = await api.get(`/api/v1/papers/${paperId}`)
+    return response.data
+  }
+)
+
+export const deletePaper = createAsyncThunk(
+  'papers/deletePaper',
+  async (paperId: number) => {
+    await api.delete(`/api/v1/papers/${paperId}`)
+    return paperId
+  }
+)
+
 const papersSlice = createSlice({
   name: 'papers',
   initialState,
   reducers: {
     updateAgentProgress: (state, action: PayloadAction<AgentProgress>) => {
+      // Check for final completion message from backend (agent: "completed")
+      if (action.payload.agent === 'completed') {
+        state.generating = false
+        return
+      }
+
       const index = state.agentProgress.findIndex((p) => p.agent === action.payload.agent)
       if (index >= 0) {
         state.agentProgress[index] = action.payload
@@ -78,7 +100,8 @@ const papersSlice = createSlice({
         state.agentProgress = []
       })
       .addCase(generatePaper.fulfilled, (state, action) => {
-        state.generating = false
+        // We do NOT set generating = false here because it should stay true 
+        // until the multi-agent workflow finishes (handled by updateAgentProgress)
         state.currentPaper = action.payload
         state.papers.unshift(action.payload)
       })
@@ -88,6 +111,20 @@ const papersSlice = createSlice({
       })
       .addCase(fetchPapers.fulfilled, (state, action) => {
         state.papers = action.payload
+      })
+      .addCase(fetchPaperById.fulfilled, (state, action) => {
+        state.currentPaper = action.payload
+        // Update the item in the papers list as well
+        const index = state.papers.findIndex((p) => p.id === action.payload.id)
+        if (index >= 0) {
+          state.papers[index] = action.payload
+        }
+      })
+      .addCase(deletePaper.fulfilled, (state, action) => {
+        state.papers = state.papers.filter((p) => p.id !== action.payload)
+        if (state.currentPaper?.id === action.payload) {
+          state.currentPaper = null
+        }
       })
   },
 })

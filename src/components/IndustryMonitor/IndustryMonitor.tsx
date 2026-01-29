@@ -1,17 +1,29 @@
 import React, { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Card, List, Tag, Button, Space, Typography, Empty, Select } from 'antd'
-import { ReloadOutlined, LinkOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { Card, List, Tag, Button, Space, Typography, Empty, Select, Tabs } from 'antd'
+import { ReloadOutlined, LinkOutlined, ClockCircleOutlined, MonitorOutlined, SettingOutlined, PlusOutlined } from '@ant-design/icons'
 import type { RootState, AppDispatch } from '@/store/store'
-import { fetchIndustryNews, refreshIndustryNews } from '@/store/slices/industrySlice'
+import { fetchIndustryNews, searchIndustryNews, addIndustryNews } from '@/store/slices/industrySlice'
+import { message } from 'antd'
+import IndustryManagement from './IndustryManagement'
 
 const { Title, Text, Paragraph } = Typography
 
+const dateToLocaleString = (dateStr: string) => {
+  if (!dateStr) return '-'
+  try {
+    return new Date(dateStr).toLocaleDateString('zh-CN')
+  } catch {
+    return dateStr
+  }
+}
+
 const IndustryMonitor: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
-  const { news, loading } = useSelector((state: RootState) => state.industry)
+  const { news, searchResults, loading } = useSelector((state: RootState) => state.industry)
   const { topics } = useSelector((state: RootState) => state.topics)
   const [selectedTopicId, setSelectedTopicId] = React.useState<number | null>(null)
+  const [activeTab, setActiveTab] = React.useState('live')
 
   useEffect(() => {
     dispatch(fetchIndustryNews())
@@ -21,15 +33,31 @@ const IndustryMonitor: React.FC = () => {
     })
   }, [dispatch])
 
-  const handleRefresh = () => {
+  const handleSearch = () => {
     if (selectedTopicId) {
-      dispatch(refreshIndustryNews(selectedTopicId))
+      dispatch(searchIndustryNews(selectedTopicId))
+    }
+  }
+
+  const handleSaveNews = async (item: any) => {
+    try {
+      await dispatch(addIndustryNews({
+        ...item,
+        topic_id: selectedTopicId
+      })).unwrap()
+      message.success('已添加到管理动态')
+    } catch (error) {
+      message.error('添加失败')
     }
   }
 
   const handleTopicChange = (value: number) => {
     setSelectedTopicId(value)
-    // Optional: Fetch existing news for this topic when selected
+    // Only clear transient search results when changing topic if not currently loading
+    if (!loading) {
+      dispatch({ type: 'industry/search/fulfilled', payload: [] })
+    }
+    // Fetch existing news for this topic when selected
     dispatch(fetchIndustryNews(value))
   }
 
@@ -54,64 +82,112 @@ const IndustryMonitor: React.FC = () => {
               </Select.Option>
             ))}
           </Select>
-          <Button
-            type="primary"
-            icon={<ReloadOutlined />}
-            onClick={handleRefresh}
-            loading={loading}
-            disabled={!selectedTopicId}
-          >
-            AI 实时搜索动态
-          </Button>
         </Space>
       </Card>
 
-      {news.length === 0 && !loading ? (
-        <Empty description={selectedTopicId ? "暂无相关动态，点击搜索获取" : "请先选择一个选题"} />
-      ) : (
-        <List
-          grid={{ gutter: 16, column: 1 }}
-          dataSource={news}
-          loading={loading}
-          renderItem={(item) => (
-            <List.Item>
-              <Card
-                hoverable
-                title={
-                  <Space>
-                    <Text strong>{item.title}</Text>
-                    <Tag color="blue">相关度: {(item.relevance_score * 100).toFixed(0)}%</Tag>
-                  </Space>
-                }
-                extra={
-                  item.url ? (
-                    <a href={item.url} target="_blank" rel="noopener noreferrer">
-                      <Button type="link" icon={<LinkOutlined />}>
-                        查看原文
-                      </Button>
-                    </a>
-                  ) : null
-                }
-              >
-                <Paragraph ellipsis={{ rows: 3 }}>{item.content}</Paragraph>
-                <Space wrap>
-                  {item.keywords?.map((keyword) => (
-                    <Tag key={keyword} color="geekblue">
-                      {keyword}
-                    </Tag>
-                  ))}
-                </Space>
-                <div style={{ marginTop: 12 }}>
-                  <Text type="secondary">
-                    <ClockCircleOutlined /> 来源: {item.source} | 发布时间:{' '}
-                    {new Date(item.published_at).toLocaleDateString('zh-CN')}
-                  </Text>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'live',
+            label: (
+              <span>
+                <MonitorOutlined />
+                实时动态
+              </span>
+            ),
+            children: (
+              <>
+                <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => setActiveTab('manage')}
+                    disabled={!selectedTopicId}
+                  >
+                    手动添加动态
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<ReloadOutlined />}
+                    onClick={handleSearch}
+                    loading={loading}
+                    disabled={!selectedTopicId}
+                  >
+                    AI 实时探测动态
+                  </Button>
                 </div>
-              </Card>
-            </List.Item>
-          )}
-        />
-      )}
+                {searchResults.length === 0 && !loading ? (
+                  <Empty description={selectedTopicId ? "暂无搜索结果，点击搜索获取" : "请先选择一个选题"} />
+                ) : (
+                  <List
+                    grid={{ gutter: 16, column: 1 }}
+                    dataSource={searchResults}
+                    loading={loading}
+                    renderItem={(item) => (
+                      <List.Item>
+                        <Card
+                          hoverable
+                          title={
+                            <Space>
+                              <Text strong>{item.title}</Text>
+                              <Tag color="blue">相关度: {(item.relevance_score * 100).toFixed(0)}%</Tag>
+                            </Space>
+                          }
+                          extra={
+                            <Space>
+                              <Button
+                                type="primary"
+                                size="small"
+                                icon={<PlusOutlined />}
+                                onClick={() => handleSaveNews(item)}
+                              >
+                                采用动态
+                              </Button>
+                              {item.url && (
+                                <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                  <Button type="link" icon={<LinkOutlined />} size="small">
+                                    原文
+                                  </Button>
+                                </a>
+                              )}
+                            </Space>
+                          }
+                        >
+                          <Paragraph ellipsis={{ rows: 2 }}>{item.content}</Paragraph>
+                          <Space wrap>
+                            {item.keywords?.map((keyword: string) => (
+                              <Tag key={keyword} color="geekblue">
+                                {keyword}
+                              </Tag>
+                            ))}
+                          </Space>
+                          <div style={{ marginTop: 8 }}>
+                            <Text type="secondary" size="small">
+                              <ClockCircleOutlined /> 来源: {item.source} | 发布时间:{' '}
+                              {dateToLocaleString(item.published_at)}
+                            </Text>
+                          </div>
+                        </Card>
+                      </List.Item>
+                    )}
+                  />
+                )}
+              </>
+            ),
+          },
+          {
+            key: 'manage',
+            label: (
+              <span>
+                <SettingOutlined />
+                管理动态库 ({news.length})
+              </span>
+            ),
+            children: <IndustryManagement topicId={selectedTopicId} />,
+          },
+        ]}
+      />
     </div>
   )
 }
