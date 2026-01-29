@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.database import get_db
-from models.database import get_db
 from models.competitor import Competitor
 from models.topic import Topic
 from utils.anthropic_client import AnthropicClient
@@ -17,10 +16,10 @@ class CompetitorSearchItem(BaseModel):
     title: str
     authors: str
     source: str
-    url: Optional[str]
+    url: Optional[str] = None
     abstract: str
-    citations: int
-    published_at: Optional[str]
+    citations: int = 0
+    published_at: Optional[str] = None
 
 
 class CompetitorResponse(BaseModel):
@@ -29,11 +28,11 @@ class CompetitorResponse(BaseModel):
     title: str
     authors: str
     source: str
-    url: Optional[str]
+    url: Optional[str] = None
     abstract: str
-    citations: int
-    published_at: Optional[str]
-    analysis: Optional[str]
+    citations: int = 0
+    published_at: Optional[str] = None
+    analysis: Optional[str] = None
     created_at: str
 
 
@@ -143,7 +142,22 @@ async def search_competitors(topic_id: int, db: AsyncSession = Depends(get_db)):
 
         data = json.loads(json_str)
         papers = data.get("papers", [])
-        return papers
+        
+        # Map fields (especially 'date' -> 'published_at')
+        processed_papers = []
+        for p in papers:
+            processed_paper = {
+                "title": p.get("title", "Untitled"),
+                "authors": p.get("authors", "Unknown"),
+                "source": p.get("source", "Unknown"),
+                "url": p.get("url"),
+                "abstract": p.get("abstract", ""),
+                "citations": p.get("citations", 0),
+                "published_at": p.get("published_at") or p.get("date")
+            }
+            processed_papers.append(processed_paper)
+            
+        return processed_papers
 
     except Exception as e:
         print(f"Error in AI Competitor Search: {e}")

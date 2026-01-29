@@ -17,23 +17,23 @@ router = APIRouter()
 class IndustryNewsSearchItem(BaseModel):
     title: str
     source: str
-    url: Optional[str]
+    url: Optional[str] = None
     content: str
-    keywords: List[str]
-    relevance_score: float
-    published_at: Optional[str]
+    keywords: List[str] = []
+    relevance_score: float = 0.0
+    published_at: Optional[str] = None
 
 
 class IndustryNewsResponse(BaseModel):
     id: Optional[int] = None
-    topic_id: Optional[int]
+    topic_id: Optional[int] = None
     title: str
     source: str
-    url: Optional[str]
+    url: Optional[str] = None
     content: str
-    keywords: List[str]
-    relevance_score: float
-    published_at: Optional[str]
+    keywords: List[str] = []
+    relevance_score: float = 0.0
+    published_at: Optional[str] = None
     created_at: str
 
 
@@ -119,7 +119,22 @@ async def search_industry_news(topic_id: int, db: AsyncSession = Depends(get_db)
 
         data = json.loads(json_str)
         news_items = data.get("news", [])
-        return news_items
+        
+        # Map fields (especially 'date' -> 'published_at')
+        processed_items = []
+        for item in news_items:
+            processed_item = {
+                "title": item.get("title", "Untitled"),
+                "source": item.get("source", "Unknown"),
+                "url": item.get("url"),
+                "content": item.get("content", ""),
+                "keywords": item.get("keywords", []),
+                "relevance_score": item.get("relevance_score", 0.0),
+                "published_at": item.get("published_at") or item.get("date")
+            }
+            processed_items.append(processed_item)
+            
+        return processed_items
 
     except Exception as e:
         print(f"Error in Industry AI Search: {e}")
