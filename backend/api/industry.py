@@ -134,7 +134,24 @@ async def search_industry_news(topic_id: int, db: AsyncSession = Depends(get_db)
              if match:
                 json_str = match.group(1).strip()
 
-        data = json.loads(json_str)
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            # Strategy 2: Robust parsing (Find first { and last })
+            start_idx = json_str.find('{')
+            end_idx = json_str.rfind('}')
+
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                json_str = json_str[start_idx:end_idx+1]
+                try:
+                    data = json.loads(json_str)
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse extracted JSON: {e}")
+                    data = {"news": []}
+            else:
+                print(f"Could not find JSON object in response: {json_str[:100]}...")
+                data = {"news": []}
+
         news_items = data.get("news", [])
 
         # Map fields (especially 'date' -> 'published_at') and handle potential None values
