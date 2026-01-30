@@ -9,23 +9,65 @@ def migrate():
     cursor = conn.cursor()
     
     try:
-        print("Checking for 'model_signature' column in 'topics' table...")
+        # Migrate 'topics' table
+        print("Checking 'topics' table...")
         cursor.execute("PRAGMA table_info(topics)")
-        columns = [column[1] for column in cursor.fetchall()]
+        topic_columns = [column[1] for column in cursor.fetchall()]
         
-        if 'model_signature' not in columns:
-            print("Adding 'model_signature' column...")
-            cursor.execute("ALTER TABLE topics ADD COLUMN model_signature TEXT")
-            conn.commit()
-            print("Successfully added 'model_signature' column.")
+        topic_migrations = [
+            ('model_signature', 'TEXT'),
+            ('specific_topic', 'TEXT'),
+        ]
         
-        if 'specific_topic' not in columns:
-            print("Adding 'specific_topic' column...")
-            cursor.execute("ALTER TABLE topics ADD COLUMN specific_topic TEXT")
-            conn.commit()
-            print("Successfully added 'specific_topic' column.")
-        else:
-            print("'specific_topic' column already exists.")
+        for col_name, col_type in topic_migrations:
+            if col_name not in topic_columns:
+                print(f"Adding '{col_name}' column to 'topics'...")
+                cursor.execute(f"ALTER TABLE topics ADD COLUMN {col_name} {col_type}")
+                conn.commit()
+                print(f"Successfully added '{col_name}' column.")
+            else:
+                print(f"'{col_name}' column already exists in 'topics'.")
+        
+        # Migrate 'papers' table
+        print("\nChecking 'papers' table...")
+        cursor.execute("PRAGMA table_info(papers)")
+        paper_columns = [column[1] for column in cursor.fetchall()]
+        
+        paper_migrations = [
+            ('topic_ids', 'TEXT'),
+            ('detailed_scores', 'TEXT'),
+        ]
+        
+        for col_name, col_type in paper_migrations:
+            if col_name not in paper_columns:
+                print(f"Adding '{col_name}' column to 'papers'...")
+                cursor.execute(f"ALTER TABLE papers ADD COLUMN {col_name} {col_type}")
+                conn.commit()
+                print(f"Successfully added '{col_name}' column.")
+            else:
+                print(f"'{col_name}' column already exists in 'papers'.")
+        
+        # Migrate 'agent_conversations' table
+        print("\nChecking 'agent_conversations' table...")
+        cursor.execute("PRAGMA table_info(agent_conversations)")
+        conversation_columns = [column[1] for column in cursor.fetchall()]
+        
+        conversation_migrations = [
+            ('model_signature', 'TEXT'),
+            ('step_name', 'TEXT'),
+            ('input_context', 'TEXT'),
+        ]
+        
+        for col_name, col_type in conversation_migrations:
+            if col_name not in conversation_columns:
+                print(f"Adding '{col_name}' column to 'agent_conversations'...")
+                cursor.execute(f"ALTER TABLE agent_conversations ADD COLUMN {col_name} {col_type}")
+                conn.commit()
+                print(f"Successfully added '{col_name}' column.")
+            else:
+                print(f"'{col_name}' column already exists in 'agent_conversations'.")
+                
+        print("\nMigration completed successfully!")
             
     except Exception as e:
         print(f"Error during migration: {e}")
