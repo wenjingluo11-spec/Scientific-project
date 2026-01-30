@@ -20,7 +20,7 @@ const TopicSearch: React.FC = () => {
   ]
 
   return (
-    <div style={{ padding: 24 }}>
+    <div>
       <Tabs
         activeKey={activeKey}
         onChange={setActiveKey}

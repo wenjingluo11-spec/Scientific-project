@@ -53,14 +53,14 @@ const App: React.FC = () => {
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0 }}>
         <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>
           🔬 科研工程助手
         </div>
       </Header>
-      <Layout>
-        <Sider width={200} style={{ background: colorBgContainer }}>
+      <Layout style={{ flex: 1, overflow: 'hidden' }}>
+        <Sider width={200} style={{ background: colorBgContainer, overflow: 'hidden' }}>
           <Menu
             mode="inline"
             selectedKeys={[selectedMenu]}
@@ -69,14 +69,15 @@ const App: React.FC = () => {
             items={menuItems}
           />
         </Sider>
-        <Layout style={{ padding: '24px' }}>
+        <Layout style={{ padding: '12px', overflow: 'hidden' }}>
           <Content
             style={{
-              padding: 24,
+            
               margin: 0,
-              minHeight: 280,
+              padding: 12,
               background: colorBgContainer,
-              borderRadius: borderRadiusLG,
+            
+              overflow: 'auto',
             }}
           >
             {renderContent()}

@@ -323,6 +323,12 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
         onCancel={() => setHistoryModalVisible(false)}
         footer={null}
         width={800}
+        styles={{
+          body: {
+            height: 'calc(65vh - 55px)',
+            overflow: 'auto',
+          }
+        }}
       >
         <Spin spinning={historyLoading}>
           {recommendationHistory.length > 0 ? (

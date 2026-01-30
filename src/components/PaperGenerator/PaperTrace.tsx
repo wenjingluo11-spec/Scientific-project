@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Timeline, Card, Tag, Typography, Spin, Empty, Button, Drawer, Descriptions, Badge, Space, Select } from 'antd'
-import { ClockCircleOutlined, RobotOutlined, UserOutlined, FileSearchOutlined, EyeOutlined, HistoryOutlined } from '@ant-design/icons'
+import { Timeline, Tag, Typography, Spin, Empty, Space, Select, Descriptions } from 'antd'
+import { ClockCircleOutlined, RobotOutlined, UserOutlined, HistoryOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import type { RootState, AppDispatch } from '@/store/store'
 import { fetchPaperTrace, PaperTraceItem, fetchPapers } from '@/store/slices/papersSlice'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 const { Option } = Select
 
 interface PaperTraceProps {
@@ -38,7 +38,6 @@ const PaperTrace: React.FC<PaperTraceProps> = ({ paperId: initialPaperId }) => {
   const { paperTrace, traceLoading, papers } = useSelector((state: RootState) => state.papers)
   const [selectedPaperId, setSelectedPaperId] = useState<number | null>(initialPaperId)
   const [selectedItem, setSelectedItem] = useState<PaperTraceItem | null>(null)
-  const [drawerVisible, setDrawerVisible] = useState(false)
 
   // Ensure papers are loaded
   useEffect(() => {
@@ -51,6 +50,7 @@ const PaperTrace: React.FC<PaperTraceProps> = ({ paperId: initialPaperId }) => {
   useEffect(() => {
     if (selectedPaperId) {
       dispatch(fetchPaperTrace(selectedPaperId))
+      setSelectedItem(null) // 切换论文时清空选中
     }
   }, [selectedPaperId, dispatch])
 
@@ -65,168 +65,164 @@ const PaperTrace: React.FC<PaperTraceProps> = ({ paperId: initialPaperId }) => {
     setSelectedPaperId(id)
   }
 
-  const handleViewDetail = (item: PaperTraceItem) => {
+  const handleSelectItem = (item: PaperTraceItem) => {
     setSelectedItem(item)
-    setDrawerVisible(true)
   }
 
   return (
-    <div style={{ padding: '12px 24px' }}>
-      <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: 8, border: '1px outset #eee' }}>
+    <div style={{ padding: '12px 24px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0' }}>
         <Space size="large" align="center">
           <Text strong><HistoryOutlined /> 选择回放题目：</Text>
           <Select
             placeholder="请选择要回放生成过程的选题"
-            style={{ width: 450 }}
+            style={{ width: 400 }}
             value={selectedPaperId || undefined}
             onChange={handlePaperChange}
             showSearch
             optionFilterProp="children"
+            size="small"
           >
             {papers.map(p => (
               <Option key={p.id} value={p.id}>
                 <Space>
-                  <Tag color={p.status === 'completed' ? 'success' : 'processing'}>ID:{p.id}</Tag>
-                  <span style={{ fontWeight: 500 }}>{p.title}</span>
+                  <Tag color={p.status === 'completed' ? 'success' : 'processing'} style={{ margin: 0 }}>ID:{p.id}</Tag>
+                  <span>{p.title}</span>
                 </Space>
               </Option>
             ))}
           </Select>
           {selectedPaperId && (
             <Text type="secondary" style={{ fontSize: 12 }}>
-              共 {paperTrace.length} 个交互记录
+              共 {paperTrace.length} 条记录
             </Text>
           )}
         </Space>
       </div>
 
-      <Spin spinning={traceLoading}>
+      <Spin spinning={traceLoading} style={{ flex: 1 }}>
         {!selectedPaperId ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="请先在上方下拉框选择一个生成任务以查看回放"
+            description="请先选择一个生成任务"
           />
         ) : paperTrace.length === 0 && !traceLoading ? (
-          <Empty description="该任务暂无交互回放记录" />
+          <Empty description="暂无交互记录" />
         ) : (
-          <div style={{ display: 'flex' }}>
-            {/* 左侧时间轴 */}
-            <div style={{ width: '40%', paddingRight: 24, borderRight: '1px solid #f0f0f0' }}>
-              <Title level={4} style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ClockCircleOutlined /> 生成工作流时间轴
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden', gap: 16 }}>
+            {/* 左侧时间轴 - 简化版 */}
+            <div style={{ width: 280, flexShrink: 0, overflow: 'auto', paddingRight: 8 }}>
+              <Title level={5} style={{ marginBottom: 12, color: '#666' }}>
+                <ClockCircleOutlined /> 工作流时间轴
               </Title>
-              <Timeline mode="left">
-                {paperTrace.map((item) => (
-                  <Timeline.Item
-                    key={item.id}
-                    label={new Date(item.created_at).toLocaleTimeString()}
-                    dot={
-                      <RobotOutlined style={{ fontSize: '16px', color: agentRoleColors[item.agent_role] || 'blue' }} />
-                    }
-                  >
-                    <Card
-                      size="small"
-                      hoverable
-                      onClick={() => handleViewDetail(item)}
+              <Timeline
+                items={paperTrace.map((item) => ({
+                  key: item.id,
+                  color: agentRoleColors[item.agent_role] || 'blue',
+                  children: (
+                    <div
+                      onClick={() => handleSelectItem(item)}
                       style={{
                         cursor: 'pointer',
-                        borderLeft: `4px solid ${item.step_name?.includes('Revision') ? '#faad14' : '#1890ff'}`
+                        padding: '8px 12px',
+                        borderRadius: 4,
+                        background: selectedItem?.id === item.id ? '#e6f7ff' : '#fafafa',
+                        border: selectedItem?.id === item.id ? '1px solid #1890ff' : '1px solid #f0f0f0',
+                        transition: 'all 0.2s',
+                        marginBottom: 4
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <Text strong>{item.step_name || 'Processing'}</Text>
-                          <div style={{ marginTop: 4 }}>
-                            <Tag color={agentRoleColors[item.agent_role]}>
-                              {agentRoleNames[item.agent_role] || item.agent_role}
-                            </Tag>
-                          </div>
-                        </div>
-                        <Button type="link" size="small" icon={<EyeOutlined />} />
+                      <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 4 }}>
+                        {item.step_name || 'Processing'}
                       </div>
-                      {item.model_signature && (
-                        <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
-                          {item.model_signature.replace(/-- Generated by | --/g, '')}
-                        </div>
-                      )}
-                    </Card>
-                  </Timeline.Item>
-                ))}
-              </Timeline>
+                      <Space size={4}>
+                        <Tag color={agentRoleColors[item.agent_role]} style={{ margin: 0, fontSize: 11 }}>
+                          {agentRoleNames[item.agent_role] || item.agent_role}
+                        </Tag>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          {new Date(item.created_at).toLocaleTimeString()}
+                        </Text>
+                      </Space>
+                    </div>
+                  )
+                }))}
+              />
             </div>
 
-            {/* 右侧详情预览 (默认显示最新的或选中的) */}
-            <div style={{ width: '60%', paddingLeft: 24 }}>
-              <Empty description="点击左侧时间轴查看详细交互内容" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            {/* 右侧详情面板 */}
+            <div style={{ flex: 1, overflow: 'auto', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+              {selectedItem ? (
+                <div style={{ padding: 16 }}>
+                  {/* 头部信息 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}>
+                    <Space>
+                      <RobotOutlined style={{ fontSize: 18, color: agentRoleColors[selectedItem.agent_role] }} />
+                      <Text strong style={{ fontSize: 16 }}>{selectedItem.step_name}</Text>
+                      <Tag color={agentRoleColors[selectedItem.agent_role]}>
+                        {agentRoleNames[selectedItem.agent_role] || selectedItem.agent_role}
+                      </Tag>
+                    </Space>
+                    {selectedItem.model_signature && (
+                      <Tag icon={<UserOutlined />} color="gold" style={{ margin: 0 }}>
+                        {selectedItem.model_signature.replace(/-- | --/g, '')}
+                      </Tag>
+                    )}
+                  </div>
+
+                  {/* 基本信息 */}
+                  <Descriptions column={2} size="small" style={{ marginBottom: 16 }}>
+                    <Descriptions.Item label="执行时间">
+                      {new Date(selectedItem.created_at).toLocaleString()}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="迭代轮次">
+                      Round {selectedItem.iteration}
+                    </Descriptions.Item>
+                  </Descriptions>
+
+                  {/* 输入上下文 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <Text strong style={{ display: 'block', marginBottom: 8 }}>📥 输入上下文</Text>
+                    <div style={{
+                      background: '#f6f6f6',
+                      padding: 12,
+                      borderRadius: 4,
+                      maxHeight: 150,
+                      overflow: 'auto',
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {selectedItem.input_context || "无输入上下文"}
+                    </div>
+                  </div>
+
+                  {/* 输出结果 */}
+                  <div>
+                    <Text strong style={{ display: 'block', marginBottom: 8 }}>📤 输出结果</Text>
+                    <div style={{
+                      border: '1px solid #e8e8e8',
+                      borderRadius: 4,
+                      padding: 16,
+                      overflow: 'auto',
+                      maxHeight: 400
+                    }}>
+                      <ReactMarkdown>{selectedItem.output_content}</ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Empty description="点击左侧时间轴查看详情" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                </div>
+              )}
             </div>
           </div>
         )}
-
-        {/* 详情抽屉 */}
-        <Drawer
-          title={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <Space>
-                <RobotOutlined />
-                <span>{selectedItem?.step_name}</span>
-                <Tag color={selectedItem ? agentRoleColors[selectedItem.agent_role] : 'default'}>
-                  {selectedItem ? (agentRoleNames[selectedItem.agent_role] || selectedItem.agent_role) : ''}
-                </Tag>
-              </Space>
-              {selectedItem?.model_signature && (
-                <Tag icon={<UserOutlined />} color="gold">
-                  {selectedItem.model_signature.replace(/-- | --/g, '')}
-                </Tag>
-              )}
-            </div>
-          }
-          width={720}
-          onClose={() => setDrawerVisible(false)}
-          open={drawerVisible}
-        >
-          {selectedItem && (
-            <div>
-              <Descriptions column={1} bordered size="small">
-                <Descriptions.Item label="执行时间">
-                  {new Date(selectedItem.created_at).toLocaleString()}
-                </Descriptions.Item>
-                <Descriptions.Item label="轮次">
-                  Round {selectedItem.iteration}
-                </Descriptions.Item>
-              </Descriptions>
-
-              <div style={{ marginTop: 24 }}>
-                <Title level={5}>📥 输入指令 (Input Context)</Title>
-                <div style={{
-                  background: '#f5f5f5',
-                  padding: 12,
-                  borderRadius: 4,
-                  border: '1px solid #d9d9d9',
-                  maxHeight: 200,
-                  overflow: 'auto',
-                  fontFamily: 'monospace'
-                }}>
-                  {selectedItem.input_context || "无输入上下文"}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 24 }}>
-                <Title level={5}>📤 输出结果 (Output Content)</Title>
-                <div style={{
-                  border: '1px solid #d9d9d9',
-                  borderRadius: 4,
-                  padding: 16,
-                  minHeight: 200
-                }}>
-                  <ReactMarkdown>{selectedItem.output_content}</ReactMarkdown>
-                </div>
-              </div>
-            </div>
-          )}
-        </Drawer>
       </Spin>
     </div>
   )
 }
 
 export default PaperTrace
+
