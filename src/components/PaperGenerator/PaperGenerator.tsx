@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Card, Steps, Button, Progress, Space, Typography, Divider, message, Select, Tabs, Switch, Tag, Badge } from 'antd'
-import { RobotOutlined, FileTextOutlined, DownloadOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined, RocketOutlined, DownOutlined, UpOutlined } from '@ant-design/icons'
+import { Card, Steps, Button, Progress, Space, Typography, Divider, message, Select, Tabs, Tag, Badge } from 'antd'
+import { RobotOutlined, FileTextOutlined, DownloadOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined, RocketOutlined, DownOutlined, UpOutlined, ClearOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import type { RootState, AppDispatch } from '@/store/store'
-import { generatePaper, resetAgentProgress, fetchPapers, addActivePaperId, updateAgentProgress } from '@/store/slices/papersSlice'
+import { generatePaper, fetchPapers, addActivePaperId, clearCompletedTasks } from '@/store/slices/papersSlice'
 import { fetchTopics } from '@/store/slices/topicsSlice'
 import { websocketService } from '@/services/websocket'
 import PaperHistory from './PaperHistory'
@@ -26,7 +26,7 @@ const agentNames: Record<string, string> = {
 const PaperGenerator: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
   const { topics } = useSelector((state: RootState) => state.topics)
-  const { currentPaper, agentProgress, generating, papers: allPapers } = useSelector((state: RootState) => state.papers)
+  const { currentPaper, generating, papers: allPapers } = useSelector((state: RootState) => state.papers)
 
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null)
   const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([])
@@ -40,7 +40,7 @@ const PaperGenerator: React.FC = () => {
     ? topics.filter(t => t.specific_topic === selectedTheme)
     : []
 
-  const { multiAgentProgress, activePaperIds } = useSelector((state: RootState) => state.papers)
+  const { multiAgentProgress, activePaperIds, completedPaperIds } = useSelector((state: RootState) => state.papers)
   const [expandedPaperIds, setExpandedPaperIds] = useState<number[]>([]) // Track expanded states
 
   useEffect(() => {
@@ -110,37 +110,7 @@ const PaperGenerator: React.FC = () => {
     }
   }
 
-  const handleExport = async () => {
-    if (!currentPaper) return
 
-    if (window.electronAPI) {
-      const result = await window.electronAPI.saveFile(
-        `${currentPaper.title}.md`,
-        currentPaper.content
-      )
-      if (result.success) {
-        message.success('导出成功！')
-      }
-    } else {
-      // Web fallback
-      const blob = new Blob([currentPaper.content], { type: 'text/markdown' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${currentPaper.title}.md`
-      a.click()
-      URL.revokeObjectURL(url)
-      message.success('导出成功！')
-    }
-  }
-
-  const getCurrentStep = () => {
-    if (agentProgress.length === 0) return 0
-    const lastProgress = agentProgress[agentProgress.length - 1]
-    const agents = Object.keys(agentNames)
-    const index = agents.findIndex((agent) => agent === lastProgress.agent)
-    return index >= 0 ? index : 0
-  }
 
   return (
     <div>
@@ -223,7 +193,18 @@ const PaperGenerator: React.FC = () => {
                     {(generating || activePaperIds.length > 0) && (
                       <>
                         <Divider />
-                        <Title level={5}>实施生成任务队列</Title>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                          <Title level={5} style={{ margin: 0 }}>实时生成任务队列</Title>
+                          {completedPaperIds.length > 0 && (
+                            <Button
+                              size="small"
+                              icon={<ClearOutlined />}
+                              onClick={() => dispatch(clearCompletedTasks())}
+                            >
+                              清除已完成 ({completedPaperIds.length})
+                            </Button>
+                          )}
+                        </div>
 
                         {/* Vertical list of active tasks */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -501,7 +482,7 @@ const PaperGenerator: React.FC = () => {
             ),
             children: (
               <Card>
-                <PaperHistory onView={() => setActiveTab('generate')} />
+                <PaperHistory />
               </Card>
             ),
           },

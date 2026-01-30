@@ -50,6 +50,7 @@ interface PapersState {
   multiAgentProgress: Record<number, AgentProgress[]> // For concurrent tasks
   agentProgress: AgentProgress[] // Legacy/Focused progress
   activePaperIds: number[]
+  completedPaperIds: number[] // 已完成但未清除的任务 ID
   paperTrace: PaperTraceItem[]
   loading: boolean
   generating: boolean
@@ -63,6 +64,7 @@ const initialState: PapersState = {
   multiAgentProgress: {},
   agentProgress: [],
   activePaperIds: [],
+  completedPaperIds: [],
   paperTrace: [],
   loading: false,
   generating: false,
@@ -133,10 +135,18 @@ const papersSlice = createSlice({
           state.multiAgentProgress[paperId].push(action.payload)
         }
 
-        // Remove from active list if completed
+        // Mark as completed but keep in active list for display
         if (agent === 'completed') {
-          state.activePaperIds = state.activePaperIds.filter(id => id !== paperId)
-          if (state.activePaperIds.length === 0) {
+          // 添加到已完成列表（不从 activePaperIds 移除，保持卡片显示）
+          if (!state.completedPaperIds.includes(paperId)) {
+            state.completedPaperIds.push(paperId)
+          }
+          
+          // 只有当所有活跃任务都完成时才设置 generating = false
+          const allCompleted = state.activePaperIds.every(id => 
+            state.completedPaperIds.includes(id)
+          )
+          if (allCompleted) {
             state.generating = false
           }
 
@@ -165,10 +175,12 @@ const papersSlice = createSlice({
       if (action.payload) {
         delete state.multiAgentProgress[action.payload]
         state.activePaperIds = state.activePaperIds.filter(id => id !== action.payload)
+        state.completedPaperIds = state.completedPaperIds.filter(id => id !== action.payload)
       } else {
         state.multiAgentProgress = {}
         state.agentProgress = []
         state.activePaperIds = []
+        state.completedPaperIds = []
       }
     },
     addActivePaperId: (state, action: PayloadAction<number>) => {
@@ -179,6 +191,19 @@ const papersSlice = createSlice({
     },
     setCurrentPaper: (state, action: PayloadAction<Paper | null>) => {
       state.currentPaper = action.payload
+    },
+    // 清除所有已完成的任务卡片
+    clearCompletedTasks: (state) => {
+      // 从 activePaperIds 中移除已完成的
+      state.activePaperIds = state.activePaperIds.filter(
+        id => !state.completedPaperIds.includes(id)
+      )
+      // 清理已完成的进度数据
+      state.completedPaperIds.forEach(id => {
+        delete state.multiAgentProgress[id]
+      })
+      // 清空已完成列表
+      state.completedPaperIds = []
     },
   },
   extraReducers: (builder) => {
@@ -228,5 +253,5 @@ const papersSlice = createSlice({
   },
 })
 
-export const { updateAgentProgress, resetAgentProgress, setCurrentPaper, addActivePaperId } = papersSlice.actions
+export const { updateAgentProgress, resetAgentProgress, setCurrentPaper, addActivePaperId, clearCompletedTasks } = papersSlice.actions
 export default papersSlice.reducer

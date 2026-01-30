@@ -1,4 +1,4 @@
-# Electron API Types
+// Electron API Types
 interface ElectronAPI {
   saveFile: (filename: string, content: string) => Promise<{
     success: boolean;
