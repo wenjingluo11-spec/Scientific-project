@@ -352,88 +352,100 @@ const PaperGenerator: React.FC = () => {
                   </Space>
                 </Card>
 
-                {currentPaper && (
-                  <Card
-                    title={
-                      <Space>
-                        <FileTextOutlined />
-                        <Text strong>生成的论文</Text>
-                      </Space>
-                    }
-                    extra={
-                      <Button icon={<DownloadOutlined />} onClick={handleExport}>
-                        导出论文
-                      </Button>
-                    }
-                  >
-                    <div style={{ marginBottom: 24, padding: '16px', background: '#fafafa', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 24 }}>
-                      <div>
-                        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>最终评审均分 (1-10)</Text>
-                        <Title level={2} style={{ margin: 0, color: currentPaper.quality_score >= 8.5 ? '#722ed1' : currentPaper.quality_score >= 6.5 ? '#52c41a' : '#faad14' }}>
-                          {currentPaper.quality_score.toFixed(1)}
-                        </Title>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <Text strong>论文综合质量</Text>
-                          <Tag color={currentPaper.quality_score >= 8.5 ? 'purple' : currentPaper.quality_score >= 6.5 ? 'green' : 'orange'}>
-                            {currentPaper.quality_score >= 8.5 ? 'Strong Accept (顶会级)' : currentPaper.quality_score >= 6.5 ? 'Accept (推荐录用)' : 'Borderline (待改进)'}
-                          </Tag>
-                        </div>
-                        <Progress
-                          percent={currentPaper.quality_score * 10}
-                          strokeColor={{
-                            '0%': '#ff4d4f',
-                            '50%': '#faad14',
-                            '100%': '#52c41a',
-                          }}
-                          status="active"
-                          showInfo={false}
-                        />
-                      </div>
-                    </div>
+                {/* Generated Papers Display */}
+                {activePaperIds.map(id => {
+                  const paper = allPapers.find(p => p.id === id);
+                  if (!paper || !paper.content) return null;
 
-                    {/* Detailed Dimension Scores */}
-                    {currentPaper.detailed_scores && (
-                      <Card
-                        size="small"
-                        title={<Text strong style={{ fontSize: '13px' }}><HistoryOutlined /> 维度考核详情 (ICLR / NeurIPS 标准)</Text>}
-                        style={{ marginBottom: 24, border: '1px solid #f0f0f0' }}
-                        bodyStyle={{ padding: '16px 24px' }}
-                      >
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-                          {[
-                            { label: '技术创新性 (Novelty)', key: 'novelty', color: '#722ed1', desc: '方法原创性与贡献度' },
-                            { label: '实证质量 (Quality)', key: 'quality', color: '#2f54eb', desc: '实验严谨性与SOTA对比' },
-                            { label: '行文清晰度 (Clarity)', key: 'clarity', color: '#13c2c2', desc: '逻辑严密性与数学表达' },
-                            { label: '综合影响力 (Impact)', key: 'total', color: '#faad14', desc: '领域贡献与长远影响' }
-                          ].map(item => (
-                            <div key={item.key}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-                                <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>{item.label}</Text>
-                                <Text strong style={{ color: item.color, fontSize: '16px' }}>
-                                  {(currentPaper.detailed_scores as any)[item.key]?.toFixed(1) || '0.0'}
-                                </Text>
+                  return (
+                    <Card
+                      key={id}
+                      style={{ marginTop: 24, border: '1px solid #d9f7be' }}
+                      title={
+                        <Space>
+                          <FileTextOutlined />
+                          <Text strong>论文成果: {paper.title}</Text>
+                        </Space>
+                      }
+                      extra={
+                        <Button icon={<DownloadOutlined />} onClick={() => {
+                          if (window.electronAPI) {
+                            window.electronAPI.saveFile(`${paper.title}.md`, paper.content)
+                          }
+                        }}>
+                          导出此论文
+                        </Button>
+                      }
+                    >
+                      <div style={{ marginBottom: 24, padding: '16px', background: '#fafafa', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 24 }}>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>最终评审均分 (1-10)</Text>
+                          <Title level={2} style={{ margin: 0, color: paper.quality_score >= 8.5 ? '#722ed1' : paper.quality_score >= 6.5 ? '#52c41a' : '#faad14' }}>
+                            {paper.quality_score.toFixed(1)}
+                          </Title>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <Text strong>所获评价</Text>
+                            <Tag color={paper.quality_score >= 8.5 ? 'purple' : paper.quality_score >= 6.5 ? 'green' : 'orange'}>
+                              {paper.quality_score >= 8.5 ? 'Strong Accept (顶会级)' : paper.quality_score >= 6.5 ? 'Accept (推荐录用)' : 'Borderline (待改进)'}
+                            </Tag>
+                          </div>
+                          <Progress
+                            percent={paper.quality_score * 10}
+                            strokeColor={{
+                              '0%': '#ff4d4f',
+                              '50%': '#faad14',
+                              '100%': '#52c41a',
+                            }}
+                            status="active"
+                            showInfo={false}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Detailed Dimension Scores */}
+                      {paper.detailed_scores && (
+                        <Card
+                          size="small"
+                          title={<Text strong style={{ fontSize: '13px' }}><HistoryOutlined /> 维度考核详情 (ICLR / NeurIPS 标准)</Text>}
+                          style={{ marginBottom: 24, border: '1px solid #f0f0f0' }}
+                          bodyStyle={{ padding: '16px 24px' }}
+                        >
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
+                            {[
+                              { label: '技术创新性 (Novelty)', key: 'novelty', color: '#722ed1', desc: '方法原创性与贡献度' },
+                              { label: '实证质量 (Quality)', key: 'quality', color: '#2f54eb', desc: '实验严谨性与SOTA对比' },
+                              { label: '行文清晰度 (Clarity)', key: 'clarity', color: '#13c2c2', desc: '逻辑严密性与数学表达' },
+                              { label: '综合影响力 (Impact)', key: 'total', color: '#faad14', desc: '领域贡献与长远影响' }
+                            ].map(item => (
+                              <div key={item.key}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                                  <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>{item.label}</Text>
+                                  <Text strong style={{ color: item.color, fontSize: '16px' }}>
+                                    {(paper.detailed_scores as any)[item.key]?.toFixed(1) || '0.0'}
+                                  </Text>
+                                </div>
+                                <Progress
+                                  percent={(paper.detailed_scores as any)[item.key] * 10}
+                                  size="small"
+                                  showInfo={false}
+                                  strokeColor={item.color}
+                                />
+                                <Text type="secondary" style={{ fontSize: '10px', display: 'block', marginTop: 4 }}>{item.desc}</Text>
                               </div>
-                              <Progress
-                                percent={(currentPaper.detailed_scores as any)[item.key] * 10}
-                                size="small"
-                                showInfo={false}
-                                strokeColor={item.color}
-                              />
-                              <Text type="secondary" style={{ fontSize: '10px', display: 'block', marginTop: 4 }}>{item.desc}</Text>
-                            </div>
-                          ))}
-                        </div>
-                      </Card>
-                    )}
+                            ))}
+                          </div>
+                        </Card>
+                      )}
 
-                    <Divider />
-                    <div style={{ maxHeight: 600, overflow: 'auto', padding: '0 16px' }}>
-                      <ReactMarkdown>{currentPaper.content}</ReactMarkdown>
-                    </div>
-                  </Card>
-                )}
+                      <Divider />
+                      <div style={{ maxHeight: 600, overflow: 'auto', padding: '0 16px' }}>
+                        <ReactMarkdown>{paper.content}</ReactMarkdown>
+                      </div>
+                    </Card>
+                  );
+                })}
               </>
             ),
           },
