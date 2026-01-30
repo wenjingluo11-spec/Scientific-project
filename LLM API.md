@@ -14,7 +14,7 @@ http://127.0.0.1:8045/v1
  client = Anthropic(
      # 推荐使用 127.0.0.1
      base_url="http://127.0.0.1:8045",
-     api_key="sk-691331534d4a403fbd2add1841357a8f"
+     api_key="your-api-key-here"
  )
  
  # 注意: Antigravity 支持使用 Anthropic SDK 调用任意模型

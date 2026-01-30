@@ -1,6 +1,6 @@
 from anthropic import AsyncAnthropic
 from config import settings
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 import httpx
 import os
 
@@ -11,17 +11,55 @@ os.environ['NO_PROXY'] = '*'
 
 
 class AnthropicClient:
-    """Universal API client for multi-agent system"""
+    """Universal API client for multi-agent system
+    
+    配置优先级：
+    1. 传入的 config 字典或 LLMConfig 对象
+    2. 主配置缓存 (从数据库加载)
+    3. config.py 中的默认值
+    """
 
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or settings.ANTHROPIC_API_KEY
-        self.base_url = settings.ANTHROPIC_BASE_URL
-        self.model = settings.DEFAULT_MODEL
-        self.max_tokens = settings.MAX_TOKENS
+    def __init__(self, config: Optional[Union[dict, 'LLMConfig']] = None):
+        # 延迟导入避免循环依赖
+        from services.llm_config_service import get_cached_primary_config
+        
+        # 配置优先级：传入配置 > 主配置缓存 > 默认配置
+        if config:
+            # 传入了配置
+            if hasattr(config, 'api_key'):
+                # LLMConfig 对象
+                self.api_key = config.api_key
+                self.base_url = config.base_url
+                self.model = config.default_model
+                self.max_tokens = config.max_tokens
+                timeout = config.timeout
+            else:
+                # dict 配置
+                self.api_key = config.get('api_key', settings.ANTHROPIC_API_KEY)
+                self.base_url = config.get('base_url', settings.ANTHROPIC_BASE_URL)
+                self.model = config.get('default_model', settings.DEFAULT_MODEL)
+                self.max_tokens = config.get('max_tokens', settings.MAX_TOKENS)
+                timeout = config.get('timeout', settings.API_TIMEOUT)
+        else:
+            # 尝试获取主配置缓存
+            primary = get_cached_primary_config()
+            if primary:
+                self.api_key = primary.api_key
+                self.base_url = primary.base_url
+                self.model = primary.default_model
+                self.max_tokens = primary.max_tokens
+                timeout = primary.timeout
+            else:
+                # 回退到默认配置
+                self.api_key = settings.ANTHROPIC_API_KEY
+                self.base_url = settings.ANTHROPIC_BASE_URL
+                self.model = settings.DEFAULT_MODEL
+                self.max_tokens = settings.MAX_TOKENS
+                timeout = settings.API_TIMEOUT
 
         # 创建自定义 HTTP 客户端，禁用代理和设置超时 (与旧项目 Rust 实现一致)
         http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(settings.API_TIMEOUT),
+            timeout=httpx.Timeout(timeout),
             verify=True,
             follow_redirects=True
         )
@@ -32,6 +70,7 @@ class AnthropicClient:
             base_url=self.base_url,
             http_client=http_client
         )
+
 
     async def create_message(
         self,

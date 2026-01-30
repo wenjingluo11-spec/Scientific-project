@@ -11,6 +11,7 @@ import TopicSearch from './components/TopicSearch/TopicSearch'
 import PaperGenerator from './components/PaperGenerator/PaperGenerator'
 import IndustryMonitor from './components/IndustryMonitor/IndustryMonitor'
 import CompetitorAnalysis from './components/CompetitorAnalysis/CompetitorAnalysis'
+import Settings from './components/Settings/Settings'
 
 const { Header, Content, Sider } = Layout
 
@@ -45,7 +46,7 @@ const App: React.FC = () => {
       case 'competitors':
         return <CompetitorAnalysis />
       case 'settings':
-        return <div>设置页面（开发中）</div>
+        return <Settings />
       default:
         return <TopicSearch />
     }

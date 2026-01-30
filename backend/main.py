@@ -3,11 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 
-from api import topics, papers, industry, competitors
-from models.database import init_db
+from api import topics, papers, industry, competitors, llm_config
+from models.database import init_db, async_session_maker
 # 导入所有模型以确保数据库表被创建
 from models.topic import Topic
 from models.topic_recommendation import TopicRecommendation
+from models.llm_config import LLMConfig
+from services.llm_config_service import refresh_primary_config_cache
 
 
 @asynccontextmanager
@@ -15,6 +17,15 @@ async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     print("Database initialized successfully")
+    
+    # 预加载 LLM 主配置到缓存
+    async with async_session_maker() as db:
+        primary_config = await refresh_primary_config_cache(db)
+        if primary_config:
+            print(f"Loaded primary LLM config: {primary_config.name}")
+        else:
+            print("No primary LLM config found, using default settings")
+    
     yield
     # Shutdown
     print("Shutting down...")
@@ -41,6 +52,7 @@ app.include_router(topics.router, prefix="/api/v1/topics", tags=["Topics"])
 app.include_router(papers.router, prefix="/api/v1/papers", tags=["Papers"])
 app.include_router(industry.router, prefix="/api/v1/industry", tags=["Industry"])
 app.include_router(competitors.router, prefix="/api/v1/competitors", tags=["Competitors"])
+app.include_router(llm_config.router, prefix="/api/v1/llm-configs", tags=["LLM Config"])
 
 
 @app.get("/")

@@ -71,7 +71,7 @@ pip install -r requirements.txt
 
 创建 `backend/.env` 文件（可选，已在 config.py 中配置默认值）：
 ```env
-ANTHROPIC_API_KEY=sk-691331534d4a403fbd2add1841357a8f
+ANTHROPIC_API_KEY=your-api-key-here
 DATABASE_URL=sqlite+aiosqlite:///./database/scientific.db
 ```
 

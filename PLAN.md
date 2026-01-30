@@ -528,4 +528,4 @@ export class PaperGenerationSocket {
 
 ---
 
-**API Key**: sk-691331534d4a403fbd2add1841357a8f (已集成到配置中)
+**API Key**: 请在设置页面配置
