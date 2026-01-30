@@ -26,7 +26,7 @@ const agentNames: Record<string, string> = {
 const PaperGenerator: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
   const { topics } = useSelector((state: RootState) => state.topics)
-  const { currentPaper, agentProgress, generating } = useSelector((state: RootState) => state.papers)
+  const { currentPaper, agentProgress, generating, papers: allPapers } = useSelector((state: RootState) => state.papers)
 
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null)
   const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([])
@@ -211,7 +211,25 @@ const PaperGenerator: React.FC = () => {
                             const lastProgress = progress[progress.length - 1];
                             const currentStep = lastProgress ? Object.keys(agentNames).indexOf(lastProgress.agent) : 0;
                             const isExpanded = expandedPaperIds.includes(paperId);
-                            const topicInfo = topics.find(t => t.id === (lastProgress?.paperId || paperId));
+                            // Find topic info: first check if we have the paper in our history which is more reliable
+                            const paperRecord = allPapers.find(p => p.id === paperId);
+                            // If paper record exists, try to find topic from topic list by topic_id
+                            let topicTitle = '正在加载选题信息...';
+
+                            if (paperRecord) {
+                              // If we have the paper record, we can use its title (which might be "Research on...")
+                              // Or better, find the original topic
+                              const t = topics.find(t => t.id === paperRecord.topic_id);
+                              if (t) topicTitle = t.title;
+                              else topicTitle = paperRecord.title; // Fallback to paper title
+                            } else {
+                              // If paper record not yet loaded (race condition), try to find by reverse lookup?
+                              // Actually, lastProgress might not contain topicId. 
+                              // We rely on the topic list having the ID we selected.
+                              // But `selectedTopicIds` are TOPIC IDs not PAPER IDs.
+                              // We need a map. For now, let's use the Paper title if available.
+                              topicTitle = `生成任务 #${paperId}`;
+                            }
 
                             return (
                               <Card
@@ -231,7 +249,7 @@ const PaperGenerator: React.FC = () => {
                                     <Space>
                                       <Badge status={lastProgress?.status === 'completed' ? 'success' : 'processing'} />
                                       <Text strong>任务 #{paperId}:</Text>
-                                      <Text type="secondary" style={{ maxWidth: 300 }} ellipsis>{topicInfo?.title || '正在加载选题信息...'}</Text>
+                                      <Text type="secondary" style={{ maxWidth: 300 }} ellipsis>{topicTitle}</Text>
                                     </Space>
                                     <Space>
                                       <Tag color={lastProgress?.status === 'completed' ? 'green' : 'blue'}>
