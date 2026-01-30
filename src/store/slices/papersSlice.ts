@@ -80,8 +80,15 @@ export const fetchPaperTrace = createAsyncThunk(
 
 export const generatePaper = createAsyncThunk(
   'papers/generatePaper',
-  async (topicIds: number[]) => {
-    const response = await api.post(`/api/v1/papers/generate`, { topic_ids: topicIds })
+  async (args: { topicIds: number[], useDeepResearch?: boolean }) => {
+    // Determine payload based on whether we received object or array (legacy support)
+    const topicIds = Array.isArray(args) ? args : args.topicIds
+    const useDeepResearch = !Array.isArray(args) ? args.useDeepResearch : false
+
+    const response = await api.post(`/api/v1/papers/generate`, {
+      topic_ids: topicIds,
+      use_deep_research: useDeepResearch
+    })
     return response.data
   }
 )

@@ -52,13 +52,14 @@ const IndustryMonitor: React.FC = () => {
   }
 
   const handleTopicChange = (value: number) => {
-    setSelectedTopicId(value)
+    const newValue = value === -1 ? null : value
+    setSelectedTopicId(newValue)
     // Only clear transient search results when changing topic if not currently loading
     if (!loading) {
       dispatch({ type: 'industry/search/fulfilled', payload: [] })
     }
     // Fetch existing news for this topic when selected
-    dispatch(fetchIndustryNews(value))
+    dispatch(fetchIndustryNews(newValue || undefined))
   }
 
   return (
@@ -71,11 +72,17 @@ const IndustryMonitor: React.FC = () => {
         <Space>
           <Text strong>选择研究选题：</Text>
           <Select
+            showSearch
+            optionFilterProp="children"
             style={{ width: 400 }}
             placeholder="请选择一个研究选题以获取相关动态"
             onChange={handleTopicChange}
-            value={selectedTopicId}
+            value={selectedTopicId ?? -1}
+            filterOption={(input, option) =>
+              (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+            }
           >
+            <Select.Option key="all" value={-1}>全部选题</Select.Option>
             {topics.map((topic) => (
               <Select.Option key={topic.id} value={topic.id}>
                 {topic.title}
@@ -169,11 +176,11 @@ const IndustryMonitor: React.FC = () => {
                             </Text>
                             {/* Display Model Signature */}
                             {item.model_signature && (
-                                <div style={{ marginTop: 4, textAlign: 'right' }}>
-                                    <Tag color="default" style={{ color: '#999', fontSize: 10, border: 'none', background: 'transparent', margin: 0 }}>
-                                    {item.model_signature.replace(/-- | --/g, '')}
-                                    </Tag>
-                                </div>
+                              <div style={{ marginTop: 4, textAlign: 'right' }}>
+                                <Tag color="default" style={{ color: '#999', fontSize: 10, border: 'none', background: 'transparent', margin: 0 }}>
+                                  {item.model_signature.replace(/-- | --/g, '')}
+                                </Tag>
+                              </div>
                             )}
                           </div>
                         </Card>

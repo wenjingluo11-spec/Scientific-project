@@ -14,18 +14,28 @@ class GeminiDeepResearchClient:
         # Handle Base URL: default to Google's if not provided, or adapt from settings
         # If using local proxy, we assume it forwards correctly or follows Google structure
         
-        # Logic to deduce base URL from settings if not explicit
-        if not base_url:
-            # Use the configured ANTHROPIC_BASE_URL as a base for the proxy
-            # e.g. http://127.0.0.1:8045
+        # ------------------------------------------------------------------
+        # Logic to deduce Base URL and API Key
+        # ------------------------------------------------------------------
+        
+        # 1. Base URL
+        if base_url:
+            # User provided explicit base URL
+            self.base_url = base_url.rstrip('/')
+        elif "AIza" in (api_key or ""):
+             # Heuristic: If API key looks like a Google Cloud key (starts with AIza), 
+             # force use of official Google endpoint, bypassing any local proxy settings.
+             self.base_url = "https://generativelanguage.googleapis.com"
+        else:
+            # Fallback to configuring from settings (likely local proxy)
             candidate = settings.ANTHROPIC_BASE_URL.rstrip('/')
             if candidate.endswith('/v1'):
                 candidate = candidate[:-3]
             self.base_url = candidate
-        else:
-            self.base_url = base_url.rstrip('/')
 
+        # 2. API Key
         self.api_key = api_key or settings.ANTHROPIC_API_KEY
+        
         self.headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key

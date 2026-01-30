@@ -20,6 +20,7 @@ interface CompetitorsState {
   competitors: Competitor[]
   searchResults: any[]
   loading: boolean
+  searching: boolean
   error: string | null
 }
 
@@ -27,6 +28,7 @@ const initialState: CompetitorsState = {
   competitors: [],
   searchResults: [],
   loading: false,
+  searching: false,
   error: null,
 }
 
@@ -97,14 +99,15 @@ const competitorsSlice = createSlice({
         state.error = action.error.message || 'Failed to fetch competitors'
       })
       .addCase(searchCompetitors.pending, (state) => {
-        state.loading = true
+        state.searching = true
+        state.error = null
       })
       .addCase(searchCompetitors.fulfilled, (state, action) => {
-        state.loading = false
+        state.searching = false
         state.searchResults = action.payload
       })
       .addCase(searchCompetitors.rejected, (state, action) => {
-        state.loading = false
+        state.searching = false
         state.error = action.error.message || 'Failed to search competitors'
       })
       .addCase(analyzeCompetitor.pending, (state) => {

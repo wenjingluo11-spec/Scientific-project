@@ -13,6 +13,7 @@ router = APIRouter()
 
 class PaperGenerateRequest(BaseModel):
     topic_ids: List[int]
+    use_deep_research: bool = False
 
 class PaperResponse(BaseModel):
     id: int
@@ -61,7 +62,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-async def run_paper_generation(paper_id: int, topic_ids: List[int]):
+async def run_paper_generation(paper_id: int, topic_ids: List[int], use_deep_research: bool = False):
     """Background task to run paper generation"""
     async with async_session_maker() as db:
         orchestrator = AgentOrchestrator(db)
@@ -73,7 +74,8 @@ async def run_paper_generation(paper_id: int, topic_ids: List[int]):
             await orchestrator.generate_paper(
                 topic_ids=topic_ids,
                 paper_id=paper_id,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                use_deep_research=use_deep_research
             )
         except Exception as e:
             print(f"Background Paper Generation Error for {paper_id}: {e}")
@@ -165,7 +167,7 @@ async def generate_paper(
     await db.refresh(paper)
 
     # 3. Add to background tasks
-    background_tasks.add_task(run_paper_generation, paper.id, request.topic_ids)
+    background_tasks.add_task(run_paper_generation, paper.id, request.topic_ids, request.use_deep_research)
 
     return paper.to_dict()
 

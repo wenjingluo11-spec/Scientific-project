@@ -23,7 +23,7 @@ const dateToLocaleString = (dateStr: string) => {
 const CompetitorAnalysis: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
   const { topics } = useSelector((state: RootState) => state.topics)
-  const { competitors, searchResults, loading } = useSelector((state: RootState) => state.competitors)
+  const { competitors, searchResults, loading, searching } = useSelector((state: RootState) => state.competitors)
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState('live')
 
@@ -51,9 +51,10 @@ const CompetitorAnalysis: React.FC = () => {
   }
 
   const handleTopicChange = (value: number) => {
-    setSelectedTopicId(value)
+    const newValue = value === -1 ? null : value
+    setSelectedTopicId(newValue)
     dispatch({ type: 'competitors/search/fulfilled', payload: [] })
-    dispatch(fetchCompetitors(value))
+    dispatch(fetchCompetitors(newValue || undefined))
   }
 
   const handleFetchExisting = () => {
@@ -77,12 +78,17 @@ const CompetitorAnalysis: React.FC = () => {
         <Space>
           <Text strong>选择选题：</Text>
           <Select
+            showSearch
+            optionFilterProp="children"
             style={{ width: 400 }}
             placeholder="请选择一个研究选题"
             onChange={handleTopicChange}
-
-            value={selectedTopicId}
+            value={selectedTopicId ?? -1}
+            filterOption={(input, option) =>
+              (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+            }
           >
+            <Option key="all" value={-1}>全部选题</Option>
             {topics.map((topic) => (
               <Option key={topic.id} value={topic.id}>
                 {topic.title}
@@ -94,7 +100,7 @@ const CompetitorAnalysis: React.FC = () => {
             icon={<SearchOutlined />}
             onClick={handleAIsSearch}
             disabled={!selectedTopicId}
-            loading={loading}
+            loading={searching}
           >
             AI 全网搜索竞品
           </Button>
@@ -127,7 +133,7 @@ const CompetitorAnalysis: React.FC = () => {
                 <List
                   grid={{ gutter: 16, column: 1 }}
                   dataSource={searchResults}
-                  loading={loading}
+                  loading={searching}
                   renderItem={(item) => (
                     <List.Item>
                       <Card
@@ -168,11 +174,11 @@ const CompetitorAnalysis: React.FC = () => {
                         </Paragraph>
                         {/* Display Model Signature */}
                         {item.model_signature && (
-                            <div style={{ marginTop: 8, textAlign: 'right' }}>
-                                <Tag color="default" style={{ color: '#999', fontSize: 10, border: 'none', background: 'transparent', margin: 0 }}>
-                                    {item.model_signature.replace(/-- | --/g, '')}
-                                </Tag>
-                            </div>
+                          <div style={{ marginTop: 8, textAlign: 'right' }}>
+                            <Tag color="default" style={{ color: '#999', fontSize: 10, border: 'none', background: 'transparent', margin: 0 }}>
+                              {item.model_signature.replace(/-- | --/g, '')}
+                            </Tag>
+                          </div>
                         )}
                       </Card>
                     </List.Item>

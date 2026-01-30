@@ -20,6 +20,7 @@ class CompetitorSearchItem(BaseModel):
     abstract: str
     citations: int = 0
     published_at: Optional[str] = None
+    model_signature: Optional[str] = None # Added
 
 
 class CompetitorResponse(BaseModel):
@@ -33,6 +34,7 @@ class CompetitorResponse(BaseModel):
     citations: int = 0
     published_at: Optional[str] = None
     analysis: Optional[str] = None
+    model_signature: Optional[str] = None # Added
     created_at: str
 
 
@@ -45,6 +47,7 @@ class CompetitorCreate(BaseModel):
     abstract: Optional[str] = None
     citations: int = 0
     published_at: Optional[str] = None
+    model_signature: Optional[str] = None # Added
 
 
 class CompetitorUpdate(BaseModel):
@@ -281,7 +284,8 @@ async def create_competitor(comp_data: CompetitorCreate, db: AsyncSession = Depe
         url=comp_data.url,
         abstract=comp_data.abstract,
         citations=comp_data.citations,
-        published_at=pub_date
+        published_at=pub_date,
+        model_signature=comp_data.model_signature # Added
     )
     db.add(competitor)
     await db.commit()

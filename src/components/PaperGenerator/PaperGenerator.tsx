@@ -42,6 +42,7 @@ const PaperGenerator: React.FC = () => {
 
   const { multiAgentProgress, activePaperIds } = useSelector((state: RootState) => state.papers)
   const [expandedPaperIds, setExpandedPaperIds] = useState<number[]>([]) // Track expanded states
+  const [useDeepResearch, setUseDeepResearch] = useState(false) // New state for Deep Research
 
   useEffect(() => {
     dispatch(fetchTopics())
@@ -99,7 +100,7 @@ const PaperGenerator: React.FC = () => {
       // Parallel Batch Mode - Loop and trigger each independently
       for (const topicId of selectedTopicIds) {
         // We pass the single ID in a list to the backend API but it will treat it as a single-topic paper task
-        const result = await dispatch(generatePaper([topicId])).unwrap()
+        const result = await dispatch(generatePaper({ topicIds: [topicId], useDeepResearch })).unwrap()
         dispatch(addActivePaperId(result.id))
         websocketService.connect(result.id)
       }
@@ -206,7 +207,25 @@ const PaperGenerator: React.FC = () => {
                         </Select>
                       </div>
 
-                      <div style={{ paddingTop: 32 }}>
+                      <div style={{ flexBasis: '100%', marginTop: 8 }}>
+                        <Space align="center" style={{ backgroundColor: '#f0faff', padding: '12px', borderRadius: 8, border: '1px solid #bae7ff' }}>
+                          <RobotOutlined style={{ color: '#1890ff', fontSize: 20 }} />
+                          <div>
+                            <Text strong>启用 Gemini Deep Research 深度撰写模式</Text>
+                            <div style={{ fontSize: 12, color: '#666' }}>
+                              仅在“论文撰写专家”阶段启用，进行更深度的长文本生成（耗时较长）
+                            </div>
+                          </div>
+                          <Switch
+                            checked={useDeepResearch}
+                            onChange={setUseDeepResearch}
+                            checkedChildren="开启"
+                            unCheckedChildren="关闭"
+                          />
+                        </Space>
+                      </div>
+
+                      <div style={{ paddingTop: 16 }}>
                         <Button
                           type="primary"
                           icon={<RocketOutlined />}
@@ -507,7 +526,7 @@ const PaperGenerator: React.FC = () => {
           },
         ]}
       />
-    </div>
+    </div >
   )
 }
 

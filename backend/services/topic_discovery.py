@@ -52,7 +52,10 @@ class TopicDiscoveryService:
         if use_deep_research:
             try:
                 from utils.gemini_client import GeminiDeepResearchClient
-                deep_client = GeminiDeepResearchClient()
+                # You can hardcode your Google API key here for testing, or rely on the heuristic in client
+                # To be explicit, we can pass it:
+                GOOGLE_API_KEY = "AIzaSyA2P7rRmYHzN4ENaN-U65ejMzIx3FUrNOw" 
+                deep_client = GeminiDeepResearchClient(api_key=GOOGLE_API_KEY)
                 
                 # 1. 启动深度调研任务
                 research_task = (

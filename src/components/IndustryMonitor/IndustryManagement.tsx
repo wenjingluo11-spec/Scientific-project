@@ -34,14 +34,7 @@ const IndustryManagement: React.FC<IndustryManagementProps> = ({ topicId }) => {
         setIsModalVisible(true)
     }
 
-    const handleDelete = async (id: number) => {
-        try {
-            await dispatch(deleteIndustryNews(id)).unwrap()
-            message.success('删除成功')
-        } catch (error) {
-            message.error('删除失败')
-        }
-    }
+
 
     const handleFinish = async (values: any) => {
         const formattedValues = {
@@ -97,10 +90,12 @@ const IndustryManagement: React.FC<IndustryManagementProps> = ({ topicId }) => {
             key: 'action',
             render: (_: any, record: IndustryNews) => (
                 <Space size="middle">
+                    {record.url && (
+                        <a href={record.url} target="_blank" rel="noopener noreferrer">
+                            <Button icon={<LinkOutlined />}>查看</Button>
+                        </a>
+                    )}
                     <Button icon={<EditOutlined />} onClick={() => handleEdit(record)}>编辑</Button>
-                    <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.id)}>
-                        <Button danger icon={<DeleteOutlined />}>删除</Button>
-                    </Popconfirm>
                 </Space>
             ),
         },
