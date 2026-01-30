@@ -53,12 +53,12 @@ async def init_db():
     # 1. 初始化本地 SQLite (LLM 配置)
     async with local_engine.begin() as conn:
         await conn.run_sync(LocalBase.metadata.create_all)
-    print("✅ Local database (SQLite) initialized for LLM configs")
+    print("[SUCCESS] Local database (SQLite) initialized for LLM configs")
 
     # 2. 初始化远程 PostgreSQL (业务数据)
     async with remote_engine.begin() as conn:
         await conn.run_sync(RemoteBase.metadata.create_all)
-    print("✅ Remote database (PostgreSQL) initialized for business data")
+    print("[SUCCESS] Remote database (PostgreSQL) initialized for business data")
 
 
 # ==================== 依赖注入函数 ====================

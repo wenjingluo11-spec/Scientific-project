@@ -87,7 +87,9 @@ export const discoverTopics = createAsyncThunk(
     num_suggestions?: number
     use_deep_research?: boolean
   }) => {
-    const response = await api.post('/api/v1/topics/ai-discover', params)
+    const response = await api.post('/api/v1/topics/ai-discover', params, {
+      timeout: params.use_deep_research ? 600000 : 120000 // 10 minutes for deep research
+    })
     return response.data
   }
 )

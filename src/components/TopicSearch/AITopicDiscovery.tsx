@@ -163,11 +163,13 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
             />
           </Form.Item>
 
-          <Form.Item name="use_deep_research" valuePropName="checked">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0f5ff', padding: '12px', borderRadius: 8, border: '1px solid #adc6ff' }}>
-              <Switch />
+          <Form.Item name="use_deep_research" valuePropName="checked" noStyle>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0f5ff', padding: '12px', borderRadius: 8, border: '1px solid #adc6ff', marginBottom: 24 }}>
+              <Form.Item name="use_deep_research" valuePropName="checked" noStyle>
+                <Switch />
+              </Form.Item>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontWeight: 'bold', color: '#1d39c4' }}>启用 Gemini Deep Research 深度调研</span>
+                <span style={{ fontWeight: 'bold', color: '#1d39c3' }}>启用 Gemini Deep Research 深度调研</span>
                 <span style={{ fontSize: 12, color: '#666' }}>
                   智能体将自主进行长达数分钟的广泛文献搜索与深度阅读，生成更具前瞻性的选题。
                   (耗时较长，请耐心等待)
@@ -196,7 +198,11 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
               </Button>
             </Space>
             <span style={{ marginLeft: 16, color: '#888' }}>
-              {discovering ? '正在分析，预计需要 10-15 秒...' : ''}
+              {discovering ? (
+                form.getFieldValue('use_deep_research')
+                  ? '深度调研进行中，预计需要 3-5 分钟，请勿关闭页面...'
+                  : '正在分析，预计需要 10-15 秒...'
+              ) : ''}
             </span>
           </Form.Item>
         </Form>

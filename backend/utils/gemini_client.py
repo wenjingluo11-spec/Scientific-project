@@ -36,11 +36,20 @@ class GeminiDeepResearchClient:
         # 2. API Key
         self.api_key = api_key or settings.ANTHROPIC_API_KEY
         
+        print(f"[GeminiClient] Initialized with Base URL: {self.base_url}", flush=True)
+        print(f"[GeminiClient] API Key Prefix: {str(self.api_key)[:4]}...", flush=True)
+        if "googleapis.com" in self.base_url:
+            print("[GeminiClient] MODE: DIRECT (Bypassing Proxy)", flush=True)
+        else:
+            print("[GeminiClient] MODE: PROXY (Forwarding to local gateway)", flush=True)
+        
         self.headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": self.api_key
         }
         self.agent_name = "deep-research-pro-preview-12-2025"
+        # Determine if we should trust system environment proxies
+        self.trust_env = False if "googleapis.com" in self.base_url else True
 
     async def start_research(self, prompt: str) -> str:
         """
@@ -54,7 +63,9 @@ class GeminiDeepResearchClient:
             "background": True
         }
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        print(f"[GeminiClient] POSTing to: {url}", flush=True)
+        
+        async with httpx.AsyncClient(timeout=30.0, trust_env=self.trust_env) as client:
             response = await client.post(url, headers=self.headers, json=payload)
             
             if response.status_code != 200:
@@ -63,10 +74,10 @@ class GeminiDeepResearchClient:
             data = response.json()
             # Expecting data['name'] typically "interactions/ID" or just ID depending on proxy
             # Google API returns object with 'name' like 'interactions/12345...'
-            if 'name' not in data:
-                 raise Exception(f"Invalid response, missing 'name': {data}")
+            if 'name' not in data and 'id' not in data:
+                 raise Exception(f"Invalid response, missing identity field: {data}")
             
-            return data['name'] # This should be the interaction ID (resource name)
+            return data.get('name') or data.get('id')
 
     async def get_interaction_status(self, interaction_name: str) -> Dict[str, Any]:
         """
@@ -86,9 +97,11 @@ class GeminiDeepResearchClient:
         if "interactions/" in interaction_name:
             interaction_id = interaction_name.split("interactions/")[-1]
             
+        # For some proxies, the URL structure might be different, but we'll try the standard Google one first
         url = f"{self.base_url}/v1beta/interactions/{interaction_id}"
+        print(f"[GeminiClient] GEt-Polling: {url}", flush=True)
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, trust_env=self.trust_env) as client:
             response = await client.get(url, headers=self.headers)
             
             if response.status_code != 200:
@@ -100,17 +113,18 @@ class GeminiDeepResearchClient:
         """
         High-level method: Start -> Poll -> Return Final Text
         """
-        print(f"[DeepResearch] Starting task: {prompt[:50]}...")
+        print(f"[DeepResearch] Starting task: {prompt[:50]}...", flush=True)
         interaction_name = await self.start_research(prompt)
-        print(f"[DeepResearch] Task started. Name: {interaction_name}")
+        print(f"[DeepResearch] Task started. Name: {interaction_name}", flush=True)
         
         while True:
             await asyncio.sleep(poll_interval)
             status_data = await self.get_interaction_status(interaction_name)
             
-            state = status_data.get('status', 'processing') # Google uses 'status': 'completed' / 'failed'
+            # Try common state fields
+            state = (status_data.get('status') or status_data.get('state') or 'processing').lower()
             
-            if state == 'completed':
+            if state in ('completed', 'succeeded', 'done'):
                 # Extract output
                 # output format: "outputs": [{"content": "...", "text": "..."}] 
                 # SDK says outputs[-1].text
@@ -134,5 +148,47 @@ class GeminiDeepResearchClient:
             else:
                 # Still running
                 # Maybe logic to print intermediate thoughts if available?
-                print(f"[DeepResearch] Status: {state}...")
+                print(f"[DeepResearch] Status: {state}...", flush=True)
 
+    async def generate_simple_content(self, prompt: str, model_name: str = "gemini-flash-latest") -> str:
+        """
+        Invoke standard generateContent API directly. 
+        Pass key in URL for maximum compatibility.
+        """
+        clean_base = self.base_url.replace("/v1beta", "").replace("/v1", "")
+        
+        endpoints = [
+            f"{clean_base}/v1/models/{model_name}:generateContent?key={self.api_key}",
+            f"{clean_base}/v1beta/models/{model_name}:generateContent?key={self.api_key}"
+        ]
+        
+        last_error = ""
+        for url in endpoints:
+            payload = {
+                "contents": [{
+                    "parts": [{"text": prompt}]
+                }],
+                "generationConfig": {
+                    "response_mime_type": "application/json" if "JSON" in prompt.upper() else "text/plain"
+                }
+            }
+            
+            print(f"[GeminiClient] Trying Direct Call (with URL key)...", flush=True)
+            
+            try:
+                # We don't need the header key if we pass it in the URL, but keeping Content-Type
+                headers = {"Content-Type": "application/json"}
+                async with httpx.AsyncClient(timeout=60.0, trust_env=self.trust_env) as client:
+                    response = await client.post(url, headers=headers, json=payload)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data['candidates'][0]['content']['parts'][0]['text']
+                    else:
+                        last_error = response.text
+                        continue
+            except Exception as e:
+                last_error = str(e)
+                continue
+                
+        raise Exception(f"Failed to generate content after trying multiple endpoints. Last error: {last_error}")
