@@ -317,15 +317,41 @@ class AgentOrchestrator:
                 lines = lines[:-1]
                 cleaned_content = '\n'.join(lines).strip()
 
-        # 3. Final polish: Remove common conversational prefixes if content starts with Markdown headers
-        # e.g., "Certainly! Here is the paper: # Title" -> "# Title"
-        header_match = re.search(r'(^|\n)(#+ .+)[\s\S]*', cleaned_content)
-        if header_match:
-            header_start = header_match.start(2)
-            # If there's content before the first header, and it's short/conversational, strip it
-            prefix = cleaned_content[:header_start].strip()
-            if prefix and len(prefix) < 300: # Heuristic: conversational intros are usually short
-                cleaned_content = cleaned_content[header_start:].strip()
+        # 3. Aggressive Preamble Removal
+        # Strategy: Find the first occurrence of a Markdown Header (#, ##, ###) or "Abstract"
+        # and discard everything before it. This handles cases like "Sure! Here is the paper:\n\n# The Paper Title..."
+        
+        match = re.search(r'(^|\n)(#+\s|Abstract|摘要)', cleaned_content, re.IGNORECASE)
+        if match:
+            # If the match starts with a newline, we want to include it or trim nicely, 
+            # effectively we want the content starting from the header line
+            # match.start() gives index of newline if group 1 matched newline
+            # simpler: split at the match, keep only the second part (and re-add the separator if needed)
+            
+            # actually, simpler approach:
+            # content[start_index:].lstrip() might leave the newline.
+            # let's be precise.
+            
+            # If group 1 matched newline, the header starts at match.start() + 1
+            if match.group(0).startswith('\n'):
+                cleaned_content = cleaned_content[match.start()+1:]
+            else:
+                cleaned_content = cleaned_content[match.start():]
+        else:
+            # Fallback: Remove specific conversational markers
+            conversational_prefixes = [
+                "Certainly!", "Sure,", "Here is", "Below is", 
+                "你好", "好的", "当然", "以下是", "修订后的"
+            ]
+            for prefix in conversational_prefixes:
+                if cleaned_content.strip().startswith(prefix):
+                    # Try to find the next double newline which usually starts the content
+                    parts = cleaned_content.split('\n\n', 1)
+                    if len(parts) > 1:
+                        cleaned_content = parts[1]
+                    break
+        
+        cleaned_content = cleaned_content.strip() # Ensure final content is stripped
 
         # Fallback if signature not found
         if not signature:
