@@ -79,24 +79,41 @@ const PaperHistory: React.FC<PaperHistoryProps> = ({ onView }) => {
             title: '生成时间',
             dataIndex: 'created_at',
             key: 'created_at',
-            width: '15%',
+            width: 120,
             render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
         },
         {
             title: '操作',
             key: 'action',
+            fixed: 'right' as const,
+            width: 150,
             render: (_: any, record: Paper) => (
-                <Space size="middle">
+                <Space size="small">
                     <Button
                         type="link"
+                        size="small"
                         icon={<EyeOutlined />}
                         onClick={() => handleView(record)}
                         disabled={record.status !== 'completed'}
+                        style={{ padding: '0 4px' }}
                     >
                         查看
                     </Button>
-                    <Popconfirm title="确定删除这篇论文吗？" onConfirm={() => handleDelete(record.id)}>
-                        <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
+                    <Popconfirm
+                        title="确定删除这篇论文吗？"
+                        onConfirm={() => handleDelete(record.id)}
+                        okText="确定"
+                        cancelText="取消"
+                    >
+                        <Button
+                            type="link"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            style={{ padding: '0 4px' }}
+                        >
+                            删除
+                        </Button>
                     </Popconfirm>
                 </Space>
             ),
@@ -110,6 +127,7 @@ const PaperHistory: React.FC<PaperHistoryProps> = ({ onView }) => {
             loading={loading}
             rowKey="id"
             pagination={{ pageSize: 8 }}
+            scroll={{ x: 'max-content' }}
         />
     )
 }

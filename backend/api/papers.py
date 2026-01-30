@@ -12,7 +12,7 @@ import asyncio
 router = APIRouter()
 
 class PaperGenerateRequest(BaseModel):
-    topic_id: int
+    topic_ids: List[int]
 
 class PaperResponse(BaseModel):
     id: int
@@ -60,7 +60,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-async def run_paper_generation(paper_id: int, topic_id: int):
+async def run_paper_generation(paper_id: int, topic_ids: List[int]):
     """Background task to run paper generation"""
     async with async_session_maker() as db:
         orchestrator = AgentOrchestrator(db)
@@ -70,7 +70,7 @@ async def run_paper_generation(paper_id: int, topic_id: int):
             
         try:
             await orchestrator.generate_paper(
-                topic_id=topic_id,
+                topic_ids=topic_ids,
                 paper_id=paper_id,
                 progress_callback=progress_callback
             )
@@ -141,17 +141,22 @@ async def generate_paper(
     db: AsyncSession = Depends(get_db),
 ):
     """Start paper generation in background"""
+    import json
 
-    # 1. Get Topic
-    result = await db.execute(select(Topic).where(Topic.id == request.topic_id))
-    topic = result.scalar_one_or_none()
-    if not topic:
-        raise HTTPException(status_code=404, detail="Topic not found")
+    if not request.topic_ids:
+        raise HTTPException(status_code=400, detail="At least one topic ID is required")
+
+    # 1. Get Topics
+    result = await db.execute(select(Topic).where(Topic.id.in_(request.topic_ids)))
+    topics_list = result.scalars().all()
+    if not topics_list:
+        raise HTTPException(status_code=404, detail="No topics found")
 
     # 2. Create Paper entry immediately
     paper = Paper(
-        topic_id=request.topic_id,
-        title=f"Research on {topic.title}",
+        topic_id=request.topic_ids[0],
+        topic_ids=json.dumps(request.topic_ids),
+        title=f"Research on {', '.join([t.title for t in topics_list])}"[:500],
         status="processing",
     )
     db.add(paper)
@@ -159,7 +164,7 @@ async def generate_paper(
     await db.refresh(paper)
 
     # 3. Add to background tasks
-    background_tasks.add_task(run_paper_generation, paper.id, request.topic_id)
+    background_tasks.add_task(run_paper_generation, paper.id, request.topic_ids)
 
     return paper.to_dict()
 

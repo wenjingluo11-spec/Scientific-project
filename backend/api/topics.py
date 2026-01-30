@@ -16,6 +16,7 @@ class TopicCreate(BaseModel):
     title: str
     description: Optional[str] = None
     field: Optional[str] = None
+    specific_topic: Optional[str] = None
     keywords: Optional[List[str]] = None
 
 
@@ -24,6 +25,7 @@ class TopicResponse(BaseModel):
     title: str
     description: Optional[str]
     field: Optional[str]
+    specific_topic: Optional[str] = None
     keywords: List[str]
     status: str
     created_at: str
@@ -43,6 +45,7 @@ async def get_topics(db: AsyncSession = Depends(get_db)):
 
 class TopicDiscoveryRequest(BaseModel):
     research_field: str
+    topic: Optional[str] = None
     keywords: List[str]
     description: Optional[str] = None
     num_suggestions: int = 5
@@ -67,6 +70,7 @@ async def discover_topics(request: TopicDiscoveryRequest, db: AsyncSession = Dep
         result = await service.discover(
             field=request.research_field,
             keywords=request.keywords,
+            topic=request.topic,
             description=request.description,
             num_suggestions=request.num_suggestions
         )
@@ -133,6 +137,7 @@ async def batch_create_topics(
                 title=topic_data.title,
                 description=topic_data.description,
                 field=topic_data.field,
+                specific_topic=topic_data.specific_topic,
                 keywords=json.dumps(topic_data.keywords or [], ensure_ascii=False),
                 status="pending",
             )
@@ -171,6 +176,7 @@ async def create_topic(topic_data: TopicCreate, db: AsyncSession = Depends(get_d
         title=topic_data.title,
         description=topic_data.description,
         field=topic_data.field,
+        specific_topic=topic_data.specific_topic,
         keywords=json.dumps(topic_data.keywords or [], ensure_ascii=False),
         status="pending",
     )

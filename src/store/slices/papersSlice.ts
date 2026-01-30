@@ -14,6 +14,7 @@ export interface Paper {
 }
 
 export interface AgentProgress {
+  paperId?: number
   agent: string
   status: 'waiting' | 'working' | 'completed'
   message: string
@@ -34,22 +35,26 @@ export interface PaperTraceItem {
 interface PapersState {
   papers: Paper[]
   currentPaper: Paper | null
-  agentProgress: AgentProgress[]
-  paperTrace: PaperTraceItem[] // Added
+  multiAgentProgress: Record<number, AgentProgress[]> // For concurrent tasks
+  agentProgress: AgentProgress[] // Legacy/Focused progress
+  activePaperIds: number[]
+  paperTrace: PaperTraceItem[]
   loading: boolean
   generating: boolean
-  traceLoading: boolean // Added
+  traceLoading: boolean
   error: string | null
 }
 
 const initialState: PapersState = {
   papers: [],
   currentPaper: null,
+  multiAgentProgress: {},
   agentProgress: [],
-  paperTrace: [], // Added
+  activePaperIds: [],
+  paperTrace: [],
   loading: false,
   generating: false,
-  traceLoading: false, // Added
+  traceLoading: false,
   error: null,
 }
 
@@ -63,8 +68,8 @@ export const fetchPaperTrace = createAsyncThunk(
 
 export const generatePaper = createAsyncThunk(
   'papers/generatePaper',
-  async (topicId: number) => {
-    const response = await api.post(`/api/v1/papers/generate`, { topic_id: topicId })
+  async (topicIds: number[]) => {
+    const response = await api.post(`/api/v1/papers/generate`, { topic_ids: topicIds })
     return response.data
   }
 )
@@ -95,21 +100,61 @@ const papersSlice = createSlice({
   initialState,
   reducers: {
     updateAgentProgress: (state, action: PayloadAction<AgentProgress>) => {
-      // Check for final completion message from backend (agent: "completed")
-      if (action.payload.agent === 'completed') {
+      const { paperId, agent } = action.payload
+
+      // Handle completion globally if no paperId (legacy)
+      if (agent === 'completed' && !paperId) {
         state.generating = false
         return
       }
 
-      const index = state.agentProgress.findIndex((p) => p.agent === action.payload.agent)
-      if (index >= 0) {
-        state.agentProgress[index] = action.payload
-      } else {
-        state.agentProgress.push(action.payload)
+      // If we have a paperId, update multi-progress
+      if (paperId) {
+        if (!state.multiAgentProgress[paperId]) {
+          state.multiAgentProgress[paperId] = []
+        }
+
+        const index = state.multiAgentProgress[paperId].findIndex(p => p.agent === agent)
+        if (index >= 0) {
+          state.multiAgentProgress[paperId][index] = action.payload
+        } else {
+          state.multiAgentProgress[paperId].push(action.payload)
+        }
+
+        // Remove from active list if completed
+        if (agent === 'completed') {
+          state.activePaperIds = state.activePaperIds.filter(id => id !== paperId)
+          if (state.activePaperIds.length === 0) {
+            state.generating = false
+          }
+        }
+      }
+
+      // Always sync to focused progress for the current paper being viewed
+      if (!paperId || state.currentPaper?.id === paperId) {
+        const index = state.agentProgress.findIndex((p) => p.agent === agent)
+        if (index >= 0) {
+          state.agentProgress[index] = action.payload
+        } else {
+          state.agentProgress.push(action.payload)
+        }
       }
     },
-    resetAgentProgress: (state) => {
-      state.agentProgress = []
+    resetAgentProgress: (state, action: PayloadAction<number | undefined>) => {
+      if (action.payload) {
+        delete state.multiAgentProgress[action.payload]
+        state.activePaperIds = state.activePaperIds.filter(id => id !== action.payload)
+      } else {
+        state.multiAgentProgress = {}
+        state.agentProgress = []
+        state.activePaperIds = []
+      }
+    },
+    addActivePaperId: (state, action: PayloadAction<number>) => {
+      if (!state.activePaperIds.includes(action.payload)) {
+        state.activePaperIds.push(action.payload)
+        state.generating = true
+      }
     },
     setCurrentPaper: (state, action: PayloadAction<Paper | null>) => {
       state.currentPaper = action.payload
@@ -162,5 +207,5 @@ const papersSlice = createSlice({
   },
 })
 
-export const { updateAgentProgress, resetAgentProgress, setCurrentPaper } = papersSlice.actions
+export const { updateAgentProgress, resetAgentProgress, setCurrentPaper, addActivePaperId } = papersSlice.actions
 export default papersSlice.reducer

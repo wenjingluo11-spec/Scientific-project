@@ -33,6 +33,7 @@ const TopicManagement: React.FC = () => {
         title: values.title,
         description: values.description,
         field: values.field,
+        specific_topic: values.specific_topic,
         keywords: values.keywords?.split(',').map((k: string) => k.trim()) || [],
       })).unwrap()
       message.success('选题创建成功！')
@@ -54,13 +55,20 @@ const TopicManagement: React.FC = () => {
       title: '研究领域',
       dataIndex: 'field',
       key: 'field',
+      width: '10%',
+    },
+    {
+      title: '主题/细分方向',
+      dataIndex: 'specific_topic',
+      key: 'specific_topic',
       width: '15%',
+      render: (topic: string) => topic ? <Tag color="cyan">{topic}</Tag> : '-'
     },
     {
       title: '关键词',
       dataIndex: 'keywords',
       key: 'keywords',
-      width: '25%',
+      width: '20%',
       render: (keywords: string[]) => (
         <>
           {keywords?.map((keyword) => (
@@ -171,6 +179,14 @@ const TopicManagement: React.FC = () => {
               <Option value="经济学">经济学</Option>
               <Option value="其他">其他</Option>
             </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="specific_topic"
+            label="主题/细分方向"
+            rules={[{ required: true, message: '请输入主题/细分方向' }]}
+          >
+            <Input placeholder="例如：基于Transformer的目标检测" />
           </Form.Item>
 
           <Form.Item name="keywords" label="关键词">
