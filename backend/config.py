@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = "sk-f3cdd22cdf5340c78eca9cc4f9b6258c"
     
     # Google Gemini API Key (用于 Deep Research)
-    GOOGLE_API_KEY: str = "AIzaSyDlm8rZi6WtlbWUvxkMEV_X1R5E2_rXLaA"
+    GOOGLE_API_KEY: str = "AIzaSyCGsb2h4liLLrU_zHE7YORNCyG9pAugXGg"
 
     # Anthropic API Configuration - 注意：SDK 会自动拼接 /v1/messages
     ANTHROPIC_BASE_URL: str = "http://127.0.0.1:8045"
