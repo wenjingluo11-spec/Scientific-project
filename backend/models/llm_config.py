@@ -1,11 +1,11 @@
 """LLM Configuration Model - 存储多个 LLM 配置"""
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
-from models.database import Base
+from models.database import LocalBase  # 使用本地数据库 Base
 from datetime import datetime
 
 
-class LLMConfig(Base):
+class LLMConfig(LocalBase):
     """LLM 模型配置"""
     __tablename__ = "llm_configs"
     

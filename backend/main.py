@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 
 from api import topics, papers, industry, competitors, llm_config
-from models.database import init_db, async_session_maker
+from models.database import init_db, local_session_maker  # 使用本地 session 加载 LLM 配置
 # 导入所有模型以确保数据库表被创建
 from models.topic import Topic
 from models.topic_recommendation import TopicRecommendation
@@ -18,8 +18,8 @@ async def lifespan(app: FastAPI):
     await init_db()
     print("Database initialized successfully")
     
-    # 预加载 LLM 主配置到缓存
-    async with async_session_maker() as db:
+    # 预加载 LLM 主配置到缓存 (从本地 SQLite)
+    async with local_session_maker() as db:
         primary_config = await refresh_primary_config_cache(db)
         if primary_config:
             print(f"Loaded primary LLM config: {primary_config.name}")

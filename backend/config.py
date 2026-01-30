@@ -14,8 +14,11 @@ class Settings(BaseSettings):
     # Anthropic API Configuration - 注意：SDK 会自动拼接 /v1/messages
     ANTHROPIC_BASE_URL: str = "http://127.0.0.1:8045"
 
-    # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./database/scientific.db"
+    # Database - 远程 PostgreSQL (业务数据)
+    DATABASE_URL: str = "postgresql+asyncpg://llm_dev:tphy%40123@182.92.74.187:9124/research"
+    
+    # Database - 本地 SQLite (LLM 配置)
+    LOCAL_DB_URL: str = "sqlite+aiosqlite:///./database/local_config.db"
 
     # API Settings
     API_HOST: str = "0.0.0.0"

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import httpx
 
-from models.database import get_db
+from models.database import get_local_db  # LLM 配置使用本地数据库
 from models.llm_config import LLMConfig
 from services import llm_config_service
 from config import settings
@@ -65,14 +65,14 @@ class TestConnectionResponse(BaseModel):
 # ==================== API Endpoints ====================
 
 @router.get("/", response_model=List[LLMConfigResponse])
-async def get_all_configs(db: AsyncSession = Depends(get_db)):
+async def get_all_configs(db: AsyncSession = Depends(get_local_db)):
     """获取所有 LLM 配置（API Key 脱敏）"""
     configs = await llm_config_service.get_all_configs(db)
     return [config.to_dict() for config in configs]
 
 
 @router.get("/primary", response_model=Optional[LLMConfigResponse])
-async def get_primary_config(db: AsyncSession = Depends(get_db)):
+async def get_primary_config(db: AsyncSession = Depends(get_local_db)):
     """获取当前主配置"""
     config = await llm_config_service.get_primary_config(db)
     if not config:
@@ -94,7 +94,7 @@ async def get_primary_config(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{config_id}", response_model=LLMConfigResponse)
-async def get_config(config_id: int, db: AsyncSession = Depends(get_db)):
+async def get_config(config_id: int, db: AsyncSession = Depends(get_local_db)):
     """获取单个配置"""
     config = await llm_config_service.get_config_by_id(db, config_id)
     if not config:
@@ -105,7 +105,7 @@ async def get_config(config_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/", response_model=LLMConfigResponse)
 async def create_config(
     config_data: LLMConfigCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_local_db)
 ):
     """创建新 LLM 配置"""
     try:
@@ -121,7 +121,7 @@ async def create_config(
 async def update_config(
     config_id: int,
     config_data: LLMConfigUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_local_db)
 ):
     """更新 LLM 配置"""
     config = await llm_config_service.update_config(
@@ -133,7 +133,7 @@ async def update_config(
 
 
 @router.delete("/{config_id}")
-async def delete_config(config_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_config(config_id: int, db: AsyncSession = Depends(get_local_db)):
     """删除 LLM 配置"""
     success = await llm_config_service.delete_config(db, config_id)
     if not success:
@@ -142,7 +142,7 @@ async def delete_config(config_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{config_id}/set-primary", response_model=LLMConfigResponse)
-async def set_primary(config_id: int, db: AsyncSession = Depends(get_db)):
+async def set_primary(config_id: int, db: AsyncSession = Depends(get_local_db)):
     """设置为主配置"""
     config = await llm_config_service.set_primary_config(db, config_id)
     if not config:
