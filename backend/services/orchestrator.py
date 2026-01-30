@@ -179,8 +179,13 @@ class AgentOrchestrator:
                 scores=detailed_scores
             )
 
-            # Revision Loop - Threshold is 9.0
-            while quality_score < 9.0 and current_iteration < max_iterations:
+            # Revision Loop - Threshold is now ALL dimensions >= 9.0
+            def criteria_met(scores):
+                return (scores.get('novelty', 0) >= 9.0 and 
+                        scores.get('quality', 0) >= 9.0 and 
+                        scores.get('clarity', 0) >= 9.0)
+
+            while not criteria_met(detailed_scores) and current_iteration < max_iterations:
                 current_iteration += 1
                 
                 # Dynamic Progress Update
@@ -190,7 +195,7 @@ class AgentOrchestrator:
                     "paper_revisor",
                     "working",
                     int(progress_percent),
-                    f"正在进行第 {current_iteration} 轮迭代修正，当前评分 {quality_score}...",
+                    f"正在进行第 {current_iteration} 轮迭代修正，当前各维评分尚未全满 (N:{detailed_scores.get('novelty')}, Q:{detailed_scores.get('quality')}, C:{detailed_scores.get('clarity')})...",
                     paper_id=paper.id,
                     scores=detailed_scores
                 )
@@ -199,7 +204,8 @@ class AgentOrchestrator:
                 revision_task = (
                     f"这是当前的论文草稿：\n\n{draft_content}\n\n"
                     f"这是同行评审的意见及其维度的评分：\n\n{review_result}\n\n"
-                    f"请根据以上意见，重新修改并完善整篇论文，目标是使综合评分达到 9.0（Accept）以上。"
+                    f"请根据以上意见，对论文进行深度重构和完善。我们的目标极其严格：必须确保创新性(Novelty)、质量(Quality)和清晰度(Clarity)这三个维度的评分全部达到 9.0 以上。\n"
+                    f"目前短板维度请重点加强。"
                 )
 
                 draft_content = await self._run_agent(
