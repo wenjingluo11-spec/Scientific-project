@@ -25,7 +25,7 @@ class AgentOrchestrator:
 
     async def generate_paper(
         self,
-        topic_id: int,
+        topic_ids: List[int],
         paper_id: Optional[int] = None,
         progress_callback=None,
     ) -> Paper:
@@ -33,7 +33,7 @@ class AgentOrchestrator:
         Orchestrate multi-agent paper generation workflow
 
         Args:
-            topic_id: The research topic ID
+            topic_ids: The research topic IDs (list)
             paper_id: Optional existing paper ID to use
             progress_callback: Optional callback for progress updates
 
@@ -41,10 +41,11 @@ class AgentOrchestrator:
             Generated Paper object
         """
 
-        # Get topic
-        topic = await self._get_topic(topic_id)
-        if not topic:
-            raise ValueError(f"Topic {topic_id} not found")
+        # Get topics
+        result = await self.db.execute(select(Topic).where(Topic.id.in_(topic_ids)))
+        topics = result.scalars().all()
+        if not topics:
+            raise ValueError(f"Topics {topic_ids} not found")
 
         # Get or Create paper record
         if paper_id:
@@ -55,8 +56,9 @@ class AgentOrchestrator:
             paper.status = "processing"
         else:
             paper = Paper(
-                topic_id=topic_id,
-                title=f"Research on {topic.title}",
+                topic_id=topic_ids[0],
+                topic_ids=json.dumps(topic_ids),
+                title=f"Research on {', '.join([t.title for t in topics])}"[:500],
                 status="processing",
             )
             self.db.add(paper)
@@ -66,7 +68,7 @@ class AgentOrchestrator:
 
         # Context accumulation
         context = {
-            "topic": topic.to_dict(),
+            "topics": [t.to_dict() for t in topics],
             "literature_review": "",
             "methodology": "",
             "data_analysis": "",
@@ -76,21 +78,25 @@ class AgentOrchestrator:
 
         try:
             # Step 1: Research Director Analysis
-            await self._update_progress(progress_callback, "research_director", "working", 10)
+            await self._update_progress(progress_callback, "research_director", "working", 10, "研究主管正在规划研究大纲与任务分配...", paper_id=paper.id)
+            
+            # Combine topic info for the director
+            combined_topics_info = "\n\n".join([
+                f"选题 {i+1}:\n标题: {t.title}\n描述: {t.description}\n领域: {t.field}\n关键词: {', '.join(json.loads(t.keywords) if t.keywords else [])}"
+                for i, t in enumerate(topics)
+            ])
+
             director_analysis = await self._run_agent(
                 "research_director",
-                f"分析以下研究选题，制定研究计划：\n\n"
-                f"标题: {topic.title}\n"
-                f"描述: {topic.description}\n"
-                f"领域: {topic.field}\n"
-                f"关键词: {', '.join(json.loads(topic.keywords) if topic.keywords else [])}",
+                f"分析以下多个研究选题的关联性，并制定一个综合研究计划：\n\n"
+                f"{combined_topics_info}",
                 paper.id,
                 step_name="Research Plan"
             )
-            await self._update_progress(progress_callback, "research_director", "completed", 15)
+            await self._update_progress(progress_callback, "research_director", "completed", 15, "研究计划已制定完成", paper_id=paper.id)
 
             # Step 2: Literature Research
-            await self._update_progress(progress_callback, "literature_researcher", "working", 20)
+            await self._update_progress(progress_callback, "literature_researcher", "working", 20, "文献调研员正在检索相关学术资源并进行总结分析...", paper_id=paper.id)
             literature_review = await self._run_agent(
                 "literature_researcher",
                 f"基于以下研究计划，进行文献调研：\n\n{director_analysis}\n\n"
@@ -99,10 +105,10 @@ class AgentOrchestrator:
                 step_name="Literature Review"
             )
             context["literature_review"] = literature_review
-            await self._update_progress(progress_callback, "literature_researcher", "completed", 35)
+            await self._update_progress(progress_callback, "literature_researcher", "completed", 35, "文献调研已完成", paper_id=paper.id)
 
             # Step 3: Methodology Design
-            await self._update_progress(progress_callback, "methodology_expert", "working", 40)
+            await self._update_progress(progress_callback, "methodology_expert", "working", 40, "方法论专家正在构建研究框架与实验逻辑...", paper_id=paper.id)
             methodology = await self._run_agent(
                 "methodology_expert",
                 f"基于文献调研结果，设计研究方法：\n\n{literature_review}\n\n"
@@ -111,10 +117,10 @@ class AgentOrchestrator:
                 step_name="Methodology Design"
             )
             context["methodology"] = methodology
-            await self._update_progress(progress_callback, "methodology_expert", "completed", 50)
+            await self._update_progress(progress_callback, "methodology_expert", "completed", 50, "研究方法设计完成", paper_id=paper.id)
 
             # Step 4: Data Analysis Plan
-            await self._update_progress(progress_callback, "data_analyst", "working", 55)
+            await self._update_progress(progress_callback, "data_analyst", "working", 55, "数据分析师正在制定统计策略与结果验证方案...", paper_id=paper.id)
             data_analysis = await self._run_agent(
                 "data_analyst",
                 f"基于研究方法，提供数据分析方案：\n\n{methodology}\n\n"
@@ -123,10 +129,10 @@ class AgentOrchestrator:
                 step_name="Data Analysis Plan"
             )
             context["data_analysis"] = data_analysis
-            await self._update_progress(progress_callback, "data_analyst", "completed", 65)
+            await self._update_progress(progress_callback, "data_analyst", "completed", 65, "数据分析方案已锁定", paper_id=paper.id)
 
             # Step 5: Paper Writing
-            await self._update_progress(progress_callback, "paper_writer", "working", 70)
+            await self._update_progress(progress_callback, "paper_writer", "working", 70, "学术撰写专家正在整合所有研究成果，撰写论文初稿...", paper_id=paper.id)
             draft_content = await self._run_agent(
                 "paper_writer",
                 f"基于以上所有信息，撰写完整的学术论文：\n\n"
@@ -139,7 +145,7 @@ class AgentOrchestrator:
                 step_name="First Draft"
             )
             context["draft"] = draft_content
-            await self._update_progress(progress_callback, "paper_writer", "completed", 85)
+            await self._update_progress(progress_callback, "paper_writer", "completed", 85, "论文初稿撰写完成", paper_id=paper.id)
 
             # Step 6: Peer Review & Revision Loop
             max_iterations = 5  # 最大修改轮数
@@ -147,7 +153,8 @@ class AgentOrchestrator:
             quality_score = 0.0
 
             # 初始评审
-            await self._update_progress(progress_callback, "peer_reviewer", "working", 90)
+            # Step 6: Peer Review & Revision Loop
+            await self._update_progress(progress_callback, "peer_reviewer", "working", 90, "同行评审专家正在进行严苛的匿名评审...", paper_id=paper.id)
             review_result = await self._run_agent(
                 "peer_reviewer",
                 f"请严格评审以下论文：\n\n{draft_content}\n\n"
@@ -172,8 +179,9 @@ class AgentOrchestrator:
                     progress_callback,
                     "paper_revisor",
                     "working",
-                    progress_percent,
-                    message=f"Optimizing paper (Round {current_iteration}/5, Score: {quality_score})"
+                    int(progress_percent),
+                    f"正在进行第 {current_iteration} 轮迭代修正，当前评分 {quality_score}...",
+                    paper_id=paper.id
                 )
 
                 # 1. Revision Agent
@@ -219,7 +227,7 @@ class AgentOrchestrator:
             else:
                 print(f"Warning: Max iterations reached. Final score: {quality_score}")
 
-            await self._update_progress(progress_callback, "peer_reviewer", "completed", 98)
+            await self._update_progress(progress_callback, "peer_reviewer", "completed", 98, "评审与修正工作全部结束", paper_id=paper.id)
 
             # Update paper with final content
             paper.content = draft_content
@@ -231,7 +239,7 @@ class AgentOrchestrator:
             await self.db.refresh(paper)
 
             # CRITICAL: Send progress update AFTER saving the paper content
-            await self._update_progress(progress_callback, "completed", "completed", 100)
+            await self._update_progress(progress_callback, "completed", "completed", 100, "论文已发表至您的仓库", paper_id=paper.id)
 
             return paper
 
@@ -303,16 +311,19 @@ class AgentOrchestrator:
         )
         return result.scalar_one_or_none()
 
-    async def _update_progress(self, callback, agent: str, status: str, progress: int, message: str = None):
+    async def _update_progress(self, callback, agent: str, status: str, progress: int, message: str = None, paper_id: int = None):
         """Update progress via callback"""
         if callback:
             msg = message if message else f"{agent} is {status}"
-            await callback({
+            payload = {
                 "agent": agent,
                 "status": status,
                 "progress": progress,
                 "message": msg,
-            })
+            }
+            if paper_id:
+                payload["paperId"] = paper_id
+            await callback(payload)
 
     def _extract_quality_score(self, review: str) -> float:
         """Extract quality score from review text (JSON priority)"""

@@ -6,6 +6,7 @@ export interface Topic {
   title: string
   description: string
   field: string
+  specific_topic?: string
   keywords: string[]
   status: 'pending' | 'processing' | 'completed'
   created_at: string
@@ -26,6 +27,7 @@ export interface TopicSuggestion {
 export interface RecommendationHistory {
   id: number
   research_field: string
+  specific_topic?: string
   keywords: string[]
   description: string | null
   suggestions: TopicSuggestion[]
@@ -79,6 +81,7 @@ export const discoverTopics = createAsyncThunk(
   'topics/discoverTopics',
   async (params: {
     research_field: string
+    topic?: string
     keywords: string[]
     description?: string
     num_suggestions?: number
@@ -154,12 +157,12 @@ const topicsSlice = createSlice({
         // Inject model_signature into suggestions if present in payload
         const signature = (action.payload as any).model_signature
         if (signature) {
-            state.suggestions = action.payload.suggestions.map((s: TopicSuggestion) => ({
-                ...s,
-                model_signature: signature
-            }))
+          state.suggestions = action.payload.suggestions.map((s: TopicSuggestion) => ({
+            ...s,
+            model_signature: signature
+          }))
         } else {
-            state.suggestions = action.payload.suggestions
+          state.suggestions = action.payload.suggestions
         }
       })
       .addCase(discoverTopics.rejected, (state, action) => {
@@ -180,7 +183,15 @@ const topicsSlice = createSlice({
         state.historyLoading = false
       })
       .addCase(loadHistoricalRecommendation.fulfilled, (state, action) => {
-        state.suggestions = action.payload.suggestions
+        const signature = action.payload.model_signature
+        if (signature) {
+          state.suggestions = action.payload.suggestions.map((s: TopicSuggestion) => ({
+            ...s,
+            model_signature: signature
+          }))
+        } else {
+          state.suggestions = action.payload.suggestions
+        }
       })
   },
 })

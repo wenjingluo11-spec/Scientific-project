@@ -28,16 +28,19 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
   const [form] = Form.useForm()
   const [selectedSuggestions, setSelectedSuggestions] = useState<number[]>([])
   const [historyModalVisible, setHistoryModalVisible] = useState(false)
+  const [currentSearchTopic, setCurrentSearchTopic] = useState<string | undefined>()
 
   const handleDiscover = async (values: any) => {
     try {
       await dispatch(discoverTopics({
         research_field: values.field,
+        topic: values.topic,
         keywords: values.keywords.split(',').map((k: string) => k.trim()),
         description: values.description,
         num_suggestions: values.num_suggestions || 5
       })).unwrap()
 
+      setCurrentSearchTopic(values.topic) // 记录当前搜索的主题
       message.success('AI 推荐完成！')
       setSelectedSuggestions([]) // 清空选择
     } catch (error) {
@@ -55,6 +58,7 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
       title: suggestions[index].title,
       description: suggestions[index].description,
       field: suggestions[index].field,
+      specific_topic: currentSearchTopic, // 使用记录的主题
       keywords: suggestions[index].keywords
     }))
 
@@ -83,6 +87,17 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
       setHistoryModalVisible(false)
       message.success('已加载历史推荐')
       setSelectedSuggestions([])
+
+      // 同步当前搜索的主题状态，以便后续添加到管理列表
+      setCurrentSearchTopic(record.specific_topic)
+
+      // 更新表单显示
+      form.setFieldsValue({
+        field: record.research_field,
+        topic: record.specific_topic,
+        keywords: record.keywords.join(', '),
+        description: record.description
+      })
     } catch (error) {
       message.error('加载失败，请重试')
     }
@@ -94,7 +109,7 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
       <Card title="AI 智能推荐" style={{ marginBottom: 24 }}>
         <Form form={form} layout="vertical" onFinish={handleDiscover}>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="field"
                 label="研究领域"
@@ -113,14 +128,27 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
               </Form.Item>
             </Col>
 
-            <Col span={12}>
+            <Col span={8}>
+              <Form.Item
+                name="topic"
+                label="具体细分方向/主题"
+                rules={[{ required: true, message: '请输入您的具体研究方向' }]}
+              >
+                <Input
+                  placeholder="例如：基于Transformer的目标检测"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={8}>
               <Form.Item
                 name="keywords"
                 label="关键词"
                 rules={[{ required: true, message: '请输入关键词' }]}
               >
                 <Input
-                  placeholder="多个关键词用逗号分隔，例如：深度学习,医学影像"
+                  placeholder="多个词用逗号分隔"
                   size="large"
                 />
               </Form.Item>
@@ -256,11 +284,11 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
 
                   {/* Display Model Signature */}
                   {suggestion.model_signature && (
-                     <div style={{ marginTop: 12, textAlign: 'right' }}>
-                       <Tag color="default" style={{ color: '#999', fontSize: 12, border: 'none', background: 'transparent' }}>
-                         {suggestion.model_signature}
-                       </Tag>
-                     </div>
+                    <div style={{ marginTop: 12, textAlign: 'right' }}>
+                      <Tag color="default" style={{ color: '#999', fontSize: 12, border: 'none', background: 'transparent' }}>
+                        {suggestion.model_signature}
+                      </Tag>
+                    </div>
                   )}
                 </Card>
               ))}
@@ -305,6 +333,9 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
                       <Space>
                         <Badge status="success" />
                         <span>{record.research_field}</span>
+                        {record.specific_topic && (
+                          <Tag color="cyan">{record.specific_topic}</Tag>
+                        )}
                         <Tag color="blue">{record.suggestions.length} 个推荐</Tag>
                       </Space>
                     }

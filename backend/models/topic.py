@@ -11,6 +11,7 @@ class Topic(Base):
     title = Column(String(500), nullable=False)
     description = Column(Text)
     field = Column(String(100))
+    specific_topic = Column(String(200), nullable=True) # New column
     keywords = Column(Text)  # JSON string
     status = Column(String(20), default="pending")  # pending/processing/completed
     model_signature = Column(String(100), nullable=True)  # New column
@@ -23,6 +24,7 @@ class Topic(Base):
             "title": self.title,
             "description": self.description,
             "field": self.field,
+            "specific_topic": self.specific_topic,
             "keywords": json.loads(self.keywords) if self.keywords else [],
             "status": self.status,
             "model_signature": self.model_signature,

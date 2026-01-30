@@ -17,6 +17,7 @@ class TopicDiscoveryService:
         self,
         field: str,
         keywords: List[str],
+        topic: str = None,
         description: str = None,
         num_suggestions: int = 5
     ) -> Dict:
@@ -26,7 +27,8 @@ class TopicDiscoveryService:
         Args:
             field: 研究领域
             keywords: 关键词列表
-            description: 研究方向描述（可选）
+            topic: 具体研究主题/细分方向 (可选)
+            description: 研究方向描述 (可选)
             num_suggestions: 推荐数量，默认 5
 
         Returns:
@@ -34,14 +36,19 @@ class TopicDiscoveryService:
         """
 
         # 构建上下文
-        context = f"""研究领域: {field}
-关键词: {', '.join(keywords)}"""
+        context = f"研究领域: {field}\n"
+        if topic:
+            context += f"具体主题/细分方向: {topic}\n"
+        context += f"关键词: {', '.join(keywords)}"
 
         if description:
             context += f"\n研究方向描述: {description}"
 
         # 构建任务
-        task = f"请推荐 {num_suggestions} 个创新且可行的研究选题，严格按照 JSON 格式输出。"
+        task = f"请针对上述研究领域"
+        if topic:
+            task += f"中的 '{topic}' 这一具体主题"
+        task += f"，推荐 {num_suggestions} 个创新且可行的研究选题，严格按照 JSON 格式输出。"
 
         # 调用 AI
         response_text = await self.client.create_message(
@@ -86,6 +93,7 @@ class TopicDiscoveryService:
             try:
                 recommendation = TopicRecommendation(
                     research_field=field,
+                    specific_topic=topic,
                     keywords=json.dumps(keywords, ensure_ascii=False),
                     description=description,
                     suggestions=json.dumps(result.get('suggestions', []), ensure_ascii=False),

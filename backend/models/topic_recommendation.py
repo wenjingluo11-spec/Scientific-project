@@ -10,6 +10,7 @@ class TopicRecommendation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     research_field = Column(String(100), nullable=False)
+    specific_topic = Column(String(150), nullable=True) # New column
     keywords = Column(Text, nullable=False)  # JSON string
     description = Column(Text, nullable=True)
     suggestions = Column(Text, nullable=False)  # JSON string of all suggestions
@@ -20,6 +21,7 @@ class TopicRecommendation(Base):
         return {
             "id": self.id,
             "research_field": self.research_field,
+            "specific_topic": self.specific_topic,
             "keywords": json_lib.loads(self.keywords) if self.keywords else [],
             "description": self.description,
             "suggestions": json_lib.loads(self.suggestions) if self.suggestions else [],

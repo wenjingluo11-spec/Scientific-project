@@ -7,7 +7,8 @@ class Paper(Base):
     __tablename__ = "papers"
 
     id = Column(Integer, primary_key=True, index=True)
-    topic_id = Column(Integer, ForeignKey("topics.id"))
+    topic_id = Column(Integer, ForeignKey("topics.id"), nullable=True)
+    topic_ids = Column(String(500), nullable=True) # JSON list of IDs
     title = Column(String(500), nullable=False)
     abstract = Column(Text)
     content = Column(Text)
@@ -20,6 +21,7 @@ class Paper(Base):
         return {
             "id": self.id,
             "topic_id": self.topic_id,
+            "topic_ids": self.topic_ids,
             "title": self.title,
             "abstract": self.abstract,
             "content": self.content,

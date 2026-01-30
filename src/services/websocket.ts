@@ -2,49 +2,63 @@ import { store } from '@/store/store'
 import { updateAgentProgress, fetchPaperById } from '@/store/slices/papersSlice'
 
 class WebSocketService {
-  private ws: WebSocket | null = null
-  private reconnectAttempts = 0
+  private sockets: Map<number, WebSocket> = new Map()
+  private reconnectAttempts: Map<number, number> = new Map()
   private maxReconnectAttempts = 5
 
   connect(paperId: number) {
+    if (this.sockets.has(paperId)) return // Already connected
+
     const wsUrl = `ws://localhost:8001/api/v1/papers/ws/paper/${paperId}`
+    const ws = new WebSocket(wsUrl)
+    this.sockets.set(paperId, ws)
 
-    this.ws = new WebSocket(wsUrl)
-
-    this.ws.onopen = () => {
-      console.log('WebSocket connected')
-      this.reconnectAttempts = 0
+    ws.onopen = () => {
+      console.log(`WebSocket connected for paper ${paperId}`)
+      this.reconnectAttempts.set(paperId, 0)
     }
 
-    this.ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
-      store.dispatch(updateAgentProgress(data))
+      // Pass paperId to ensure the reducer knows which paper this belongs to
+      store.dispatch(updateAgentProgress({ ...data, paperId }))
 
       // If generation is complete, fetch the final paper content
       if (data.agent === 'completed') {
         store.dispatch(fetchPaperById(paperId))
+        this.disconnect(paperId)
       }
     }
 
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
+    ws.onerror = (error) => {
+      console.error(`WebSocket error for paper ${paperId}:`, error)
     }
 
-    this.ws.onclose = () => {
-      console.log('WebSocket disconnected')
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+    ws.onclose = () => {
+      console.log(`WebSocket disconnected for paper ${paperId}`)
+      const attempts = this.reconnectAttempts.get(paperId) || 0
+      if (attempts < this.maxReconnectAttempts) {
         setTimeout(() => {
-          this.reconnectAttempts++
+          this.reconnectAttempts.set(paperId, attempts + 1)
           this.connect(paperId)
         }, 3000)
+      } else {
+        this.sockets.delete(paperId)
       }
     }
   }
 
-  disconnect() {
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
+  disconnect(paperId?: number) {
+    if (paperId) {
+      const ws = this.sockets.get(paperId)
+      if (ws) {
+        ws.close()
+        this.sockets.delete(paperId)
+      }
+    } else {
+      // Disconnect all
+      this.sockets.forEach((ws) => ws.close())
+      this.sockets.clear()
     }
   }
 

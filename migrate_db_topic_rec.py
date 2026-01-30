@@ -20,6 +20,12 @@ def migrate_db_topic_rec():
         except sqlite3.OperationalError:
             print("Column model_signature might already exist")
 
+        try:
+            cursor.execute("ALTER TABLE topic_recommendations ADD COLUMN specific_topic TEXT")
+            print("Added specific_topic column")
+        except sqlite3.OperationalError:
+            print("Column specific_topic might already exist")
+
         conn.commit()
         print("\nMigration for TopicRecommendation completed successfully!")
 

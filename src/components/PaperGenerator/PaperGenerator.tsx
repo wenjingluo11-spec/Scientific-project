@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Card, Steps, Button, Progress, Space, Typography, Divider, message, Select, Tabs } from 'antd'
-import { RobotOutlined, FileTextOutlined, DownloadOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { Card, Steps, Button, Progress, Space, Typography, Divider, message, Select, Tabs, Switch, Tag, Badge } from 'antd'
+import { RobotOutlined, FileTextOutlined, DownloadOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined, RocketOutlined, DownOutlined, UpOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import type { RootState, AppDispatch } from '@/store/store'
-import { generatePaper, resetAgentProgress, fetchPapers } from '@/store/slices/papersSlice'
+import { generatePaper, resetAgentProgress, fetchPapers, addActivePaperId, updateAgentProgress } from '@/store/slices/papersSlice'
 import { fetchTopics } from '@/store/slices/topicsSlice'
 import { websocketService } from '@/services/websocket'
 import PaperHistory from './PaperHistory'
@@ -27,27 +27,65 @@ const PaperGenerator: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>()
   const { topics } = useSelector((state: RootState) => state.topics)
   const { currentPaper, agentProgress, generating } = useSelector((state: RootState) => state.papers)
-  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
+
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null)
+  const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([])
   const [activeTab, setActiveTab] = useState('generate')
+
+  // Extract unique themes from topics
+  const themes = Array.from(new Set(topics.map(t => t.specific_topic).filter(Boolean))) as string[]
+
+  // Filter topics based on selected theme
+  const filteredTopics = selectedTheme
+    ? topics.filter(t => t.specific_topic === selectedTheme)
+    : []
+
+  const { multiAgentProgress, activePaperIds } = useSelector((state: RootState) => state.papers)
+  const [expandedPaperIds, setExpandedPaperIds] = useState<number[]>([]) // Track expanded states
 
   useEffect(() => {
     dispatch(fetchTopics())
     dispatch(fetchPapers())
   }, [dispatch])
 
+  // Auto-select all topics under the theme when theme changes
+  useEffect(() => {
+    if (selectedTheme) {
+      const themeTopics = topics.filter(t => t.specific_topic === selectedTheme)
+      setSelectedTopicIds(themeTopics.map(t => t.id))
+    } else {
+      setSelectedTopicIds([])
+    }
+  }, [selectedTheme, topics])
+
+  const toggleExpand = (paperId: number) => {
+    setExpandedPaperIds(prev =>
+      prev.includes(paperId)
+        ? prev.filter(id => id !== paperId)
+        : [...prev, paperId]
+    )
+  }
+
   const handleGenerate = async () => {
-    if (!selectedTopicId) {
-      message.warning('请先选择一个选题')
+    if (selectedTopicIds.length === 0) {
+      message.warning('请至少选择一个选题')
       return
     }
 
     try {
-      dispatch(resetAgentProgress())
-      const result = await dispatch(generatePaper(selectedTopicId)).unwrap()
-      websocketService.connect(result.id)
-      message.success('论文生成已启动！')
+      message.info(`正在并行启动 ${selectedTopicIds.length} 个生成任务...`)
+
+      // Parallel Batch Mode - Loop and trigger each independently
+      for (const topicId of selectedTopicIds) {
+        // We pass the single ID in a list to the backend API but it will treat it as a single-topic paper task
+        const result = await dispatch(generatePaper([topicId])).unwrap()
+        dispatch(addActivePaperId(result.id))
+        websocketService.connect(result.id)
+      }
+
+      message.success('所有生成任务已成功启动！')
     } catch (error) {
-      message.error('生成失败，请重试')
+      message.error('生成启动失败，请重试')
     }
   }
 
@@ -109,65 +147,149 @@ const PaperGenerator: React.FC = () => {
 
                 <Card style={{ marginBottom: 24 }}>
                   <Space direction="vertical" style={{ width: '100%' }} size="large">
-                    <div>
-                      <Text strong style={{ marginRight: 16 }}>选择选题：</Text>
-                      <Select
-                        style={{ width: 400 }}
-                        placeholder="请选择一个研究选题"
-                        onChange={(value) => setSelectedTopicId(value)}
-                        value={selectedTopicId}
-                      >
-                        {topics.map((topic) => (
-                          <Option key={topic.id} value={topic.id}>
-                            {topic.title}
-                          </Option>
-                        ))}
-                      </Select>
-                      <Button
-                        type="primary"
-                        icon={<RobotOutlined />}
-                        onClick={handleGenerate}
-                        loading={generating}
-                        disabled={!selectedTopicId}
-                        style={{ marginLeft: 16 }}
-                      >
-                        开始生成
-                      </Button>
+                    <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 200 }}>
+                        <Text strong style={{ display: 'block', marginBottom: 8 }}>选择主题/细分方向：</Text>
+                        <Select
+                          style={{ width: '100%' }}
+                          placeholder="请选择研究主题"
+                          onChange={(value) => setSelectedTheme(value)}
+                          value={selectedTheme}
+                          size="large"
+                        >
+                          {themes.map((theme) => (
+                            <Option key={theme} value={theme}>
+                              {theme}
+                            </Option>
+                          ))}
+                        </Select>
+                      </div>
+
+                      <div style={{ flex: 2, minWidth: 300 }}>
+                        <Text strong style={{ display: 'block', marginBottom: 8 }}>选择选题 (可多选)：</Text>
+                        <Select
+                          mode="multiple"
+                          style={{ width: '100%' }}
+                          placeholder={selectedTheme ? "已默认选中全部选题，可在此取消不想要的任务" : "请先选择左侧主题"}
+                          onChange={(values) => setSelectedTopicIds(values)}
+                          value={selectedTopicIds}
+                          disabled={!selectedTheme}
+                          size="large"
+                          optionFilterProp="children"
+                        >
+                          {filteredTopics.map((topic) => (
+                            <Option key={topic.id} value={topic.id}>
+                              {topic.title}
+                            </Option>
+                          ))}
+                        </Select>
+                      </div>
+
+                      <div style={{ paddingTop: 32 }}>
+                        <Button
+                          type="primary"
+                          icon={<RocketOutlined />}
+                          onClick={handleGenerate}
+                          disabled={selectedTopicIds.length === 0}
+                          size="large"
+                          danger
+                        >
+                          批量启动并行生成
+                        </Button>
+                      </div>
                     </div>
 
-                    {generating && (
+                    {(generating || activePaperIds.length > 0) && (
                       <>
                         <Divider />
-                        <div>
-                          <Title level={5}>智能体工作流程</Title>
-                          <Steps
-                            current={getCurrentStep()}
-                            items={Object.entries(agentNames).map(([key, name]) => ({
-                              title: name,
-                              icon: <RobotOutlined />,
-                            }))}
-                          />
-                        </div>
+                        <Title level={5}>实施生成任务队列</Title>
 
-                        <Divider />
-                        <div>
-                          <Title level={5}>实时进度</Title>
-                          {agentProgress.filter(p => p.agent !== 'completed').map((progress, index) => (
-                            <Card
-                              key={index}
-                              size="small"
-                              style={{ marginBottom: 12 }}
-                              title={
-                                <Space>
-                                  <RobotOutlined />
-                                  <Text strong>{agentNames[progress.agent] || progress.agent}</Text>
-                                </Space>
-                              }
-                            >
-                              <Paragraph>{progress.message}</Paragraph>
-                              <Progress percent={progress.progress} status={progress.status === 'completed' ? 'success' : 'active'} />
-                            </Card>
-                          ))}
+                        {/* Vertical list of active tasks */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {activePaperIds.map(paperId => {
+                            const progress = multiAgentProgress[paperId] || [];
+                            const lastProgress = progress[progress.length - 1];
+                            const currentStep = lastProgress ? Object.keys(agentNames).indexOf(lastProgress.agent) : 0;
+                            const isExpanded = expandedPaperIds.includes(paperId);
+                            const topicInfo = topics.find(t => t.id === (lastProgress?.paperId || paperId));
+
+                            return (
+                              <Card
+                                key={paperId}
+                                size="small"
+                                style={{
+                                  borderRadius: 8,
+                                  border: '1px solid #e6f7ff',
+                                  transition: 'all 0.3s'
+                                }}
+                                headStyle={{
+                                  backgroundColor: '#fafafa',
+                                  borderBottom: isExpanded ? '1px solid #f0f0f0' : 'none'
+                                }}
+                                title={
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', cursor: 'pointer' }} onClick={() => toggleExpand(paperId)}>
+                                    <Space>
+                                      <Badge status={lastProgress?.status === 'completed' ? 'success' : 'processing'} />
+                                      <Text strong>任务 #{paperId}:</Text>
+                                      <Text type="secondary" style={{ maxWidth: 300 }} ellipsis>{topicInfo?.title || '正在加载选题信息...'}</Text>
+                                    </Space>
+                                    <Space>
+                                      <Tag color={lastProgress?.status === 'completed' ? 'green' : 'blue'}>
+                                        {lastProgress ? agentNames[lastProgress.agent] : '准备中...'}
+                                      </Tag>
+                                      <Button type="text" size="small" icon={isExpanded ? <UpOutlined /> : <DownOutlined />}>
+                                        {isExpanded ? '收起详情' : '展开进度'}
+                                      </Button>
+                                    </Space>
+                                  </div>
+                                }
+                              >
+                                <div style={{ padding: '8px 12px' }}>
+                                  {/* Percentage Progress Bar (Always visible) */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                                    <div style={{ flex: 1 }}>
+                                      <Progress
+                                        percent={lastProgress?.progress || 0}
+                                        size="default"
+                                        status={lastProgress?.status === 'completed' ? 'success' : 'active'}
+                                        strokeWidth={10}
+                                        showInfo={false}
+                                      />
+                                    </div>
+                                    <Text type="secondary" style={{ minWidth: 40, textAlign: 'right' }}>{lastProgress?.progress || 0}%</Text>
+                                  </div>
+
+                                  {/* Detailed Content (Shown ONLY when expanded) */}
+                                  {isExpanded && (
+                                    <div style={{ marginTop: 24, padding: '0 8px' }}>
+                                      <Divider style={{ margin: '16px 0' }} />
+                                      <Steps
+                                        size="small"
+                                        current={currentStep}
+                                        items={Object.entries(agentNames).map(([key, name]) => ({
+                                          title: <span style={{ fontSize: '12px' }}>{name}</span>,
+                                        }))}
+                                        style={{ marginBottom: 20 }}
+                                      />
+                                      {lastProgress && (
+                                        <Card size="small" style={{ backgroundColor: '#f9f9f9', border: 'none' }}>
+                                          <Space align="start">
+                                            <RobotOutlined style={{ marginTop: 4, color: '#1890ff' }} />
+                                            <div>
+                                              <Text strong style={{ fontSize: '13px' }}>{agentNames[lastProgress.agent]} 状态反馈：</Text>
+                                              <Paragraph style={{ margin: 0, color: '#555', fontSize: '13px' }}>
+                                                {lastProgress.message}
+                                              </Paragraph>
+                                            </div>
+                                          </Space>
+                                        </Card>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </Card>
+                            );
+                          })}
                         </div>
                       </>
                     )}
