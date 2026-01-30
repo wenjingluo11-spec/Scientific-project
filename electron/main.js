@@ -57,7 +57,7 @@ function startBackend() {
 app.whenReady().then(() => {
   createWindow();
   const isDev = !app.isPackaged;
-  if (!isDev) {
+  if (isDev) {
     // In development, the backend is started separately via npm script
     console.log('Development mode: Backend should be started separately');
   } else {
