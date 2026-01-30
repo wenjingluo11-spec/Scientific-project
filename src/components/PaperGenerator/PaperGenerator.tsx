@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Card, Steps, Button, Progress, Space, Typography, Divider, message, Select, Tabs, Tag, Badge } from 'antd'
+import { Card, Steps, Button, Progress, Space, Typography, Divider, message, Select, Tabs, Tag, Badge, Switch } from 'antd'
 import { RobotOutlined, FileTextOutlined, DownloadOutlined, HistoryOutlined, PlusOutlined, PlayCircleOutlined, RocketOutlined, DownOutlined, UpOutlined, ClearOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import type { RootState, AppDispatch } from '@/store/store'
@@ -40,7 +40,9 @@ const PaperGenerator: React.FC = () => {
     ? topics.filter(t => t.specific_topic === selectedTheme)
     : []
 
-  const { multiAgentProgress, activePaperIds, completedPaperIds } = useSelector((state: RootState) => state.papers)
+  const activePaperIds = useSelector((state: RootState) => state.papers.activePaperIds)
+  const completedPaperIds = useSelector((state: RootState) => state.papers.completedPaperIds || []) // Safety fallback
+  const multiAgentProgress = useSelector((state: RootState) => state.papers.multiAgentProgress)
   const [expandedPaperIds, setExpandedPaperIds] = useState<number[]>([]) // Track expanded states
   const [useDeepResearch, setUseDeepResearch] = useState(false) // New state for Deep Research
 
