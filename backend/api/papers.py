@@ -23,6 +23,7 @@ class PaperResponse(BaseModel):
     version: int
     status: str
     quality_score: float
+    detailed_scores: Optional[dict] = None
     created_at: str
 
 class PaperTraceItem(BaseModel):

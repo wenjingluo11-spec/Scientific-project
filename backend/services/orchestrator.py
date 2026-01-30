@@ -151,44 +151,55 @@ class AgentOrchestrator:
             max_iterations = 5  # 最大修改轮数
             current_iteration = 0
             quality_score = 0.0
+            detailed_scores = {}
 
-            # 初始评审
             # Step 6: Peer Review & Revision Loop
             await self._update_progress(progress_callback, "peer_reviewer", "working", 90, "同行评审专家正在进行严苛的匿名评审...", paper_id=paper.id)
             review_result = await self._run_agent(
                 "peer_reviewer",
                 f"请严格评审以下论文：\n\n{draft_content}\n\n"
-                f"请按照国际顶级期刊标准评审，提供评分和改进建议。",
+                f"请按照 ICLR/NeurIPS 顶会标准评审，提供具体维度的评分和改进建议。",
                 paper.id,
                 iteration=current_iteration + 1,
                 step_name="Initial Peer Review"
             )
             context["review"] = review_result
 
-            # Extract quality score from JSON or Fallback
-            quality_score = self._extract_quality_score(review_result)
+            # Extract quality score and detailed scores immediately
+            quality_score, detailed_scores = self._extract_detailed_scores(review_result)
 
-            # Revision Loop
-            while quality_score < 90 and current_iteration < max_iterations:
+            # Update paper progress with initial scores
+            await self._update_progress(
+                progress_callback, 
+                "peer_reviewer", 
+                "working", 
+                92, 
+                f"初步评审已完成，综合评分: {quality_score}", 
+                paper_id=paper.id,
+                scores=detailed_scores
+            )
+
+            # Revision Loop - Threshold is 9.0
+            while quality_score < 9.0 and current_iteration < max_iterations:
                 current_iteration += 1
-                print(f"Quality score {quality_score} is below 90. Starting revision round {current_iteration}...")
-
+                
                 # Dynamic Progress Update
-                progress_percent = 90 + (current_iteration / max_iterations) * 5
+                progress_percent = 92 + (current_iteration / max_iterations) * 5
                 await self._update_progress(
                     progress_callback,
                     "paper_revisor",
                     "working",
                     int(progress_percent),
                     f"正在进行第 {current_iteration} 轮迭代修正，当前评分 {quality_score}...",
-                    paper_id=paper.id
+                    paper_id=paper.id,
+                    scores=detailed_scores
                 )
 
                 # 1. Revision Agent
                 revision_task = (
                     f"这是当前的论文草稿：\n\n{draft_content}\n\n"
-                    f"这是同行评审的意见（当前评分 {quality_score}）：\n\n{review_result}\n\n"
-                    f"请根据以上意见，重新修改并完善整篇论文，目标是使评分达到 90 分以上。"
+                    f"这是同行评审的意见及其维度的评分：\n\n{review_result}\n\n"
+                    f"请根据以上意见，重新修改并完善整篇论文，目标是使综合评分达到 9.0（Accept）以上。"
                 )
 
                 draft_content = await self._run_agent(
@@ -204,8 +215,9 @@ class AgentOrchestrator:
                     progress_callback,
                     "peer_reviewer",
                     "reviewing_revision",
-                    progress_percent + 1,
-                    message=f"Reviewing revision {current_iteration}..."
+                    int(progress_percent + 1),
+                    message=f"正在评估第 {current_iteration} 轮修正效果...",
+                    paper_id=paper.id
                 )
 
                 review_result = await self._run_agent(
@@ -217,22 +229,26 @@ class AgentOrchestrator:
                     step_name=f"Peer Review Round {current_iteration}"
                 )
 
-                # Update Score
-                quality_score = self._extract_quality_score(review_result)
+                # Update Score and detailed breakdown
+                quality_score, detailed_scores = self._extract_detailed_scores(review_result)
                 context["review"] = review_result
 
             # Log final status
-            if quality_score >= 90:
-                print(f"Success! Reached target score: {quality_score}")
-            else:
-                print(f"Warning: Max iterations reached. Final score: {quality_score}")
-
-            await self._update_progress(progress_callback, "peer_reviewer", "completed", 98, "评审与修正工作全部结束", paper_id=paper.id)
+            await self._update_progress(
+                progress_callback, 
+                "peer_reviewer", 
+                "completed", 
+                98, 
+                "评审与修正工作全部结束", 
+                paper_id=paper.id,
+                scores=detailed_scores
+            )
 
             # Update paper with final content
             paper.content = draft_content
             paper.abstract = self._extract_abstract(draft_content)
             paper.quality_score = quality_score
+            paper.detailed_scores = json.dumps(detailed_scores)
             paper.status = "completed"
 
             await self.db.commit()
@@ -284,20 +300,34 @@ class AgentOrchestrator:
         return cleaned_content
 
     def _extract_signature_and_clean(self, content: str):
-        """Extract model signature from the last line and return cleaned content"""
-        lines = content.strip().split('\n')
-        signature = None
-        cleaned_content = content
+        """Extract model signature and clean reasoning/meta-content"""
+        import re
 
-        # Check last line for signature
+        # 1. Remove <think>...</think> blocks (DeepSeek style)
+        cleaned_content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+
+        # 2. Extract signature (last line)
+        lines = cleaned_content.split('\n')
+        signature = None
+        
         if lines:
             last_line = lines[-1].strip()
             if last_line.startswith("-- Generated by") and last_line.endswith("--"):
                 signature = last_line
-                # Remove the signature line
-                cleaned_content = '\n'.join(lines[:-1]).strip()
+                lines = lines[:-1]
+                cleaned_content = '\n'.join(lines).strip()
 
-        # Fallback if not found
+        # 3. Final polish: Remove common conversational prefixes if content starts with Markdown headers
+        # e.g., "Certainly! Here is the paper: # Title" -> "# Title"
+        header_match = re.search(r'(^|\n)(#+ .+)[\s\S]*', cleaned_content)
+        if header_match:
+            header_start = header_match.start(2)
+            # If there's content before the first header, and it's short/conversational, strip it
+            prefix = cleaned_content[:header_start].strip()
+            if prefix and len(prefix) < 300: # Heuristic: conversational intros are usually short
+                cleaned_content = cleaned_content[header_start:].strip()
+
+        # Fallback if signature not found
         if not signature:
             # Use default model from client if available
             signature = f"-- Generated by {self.client.model} (Fallback) --"
@@ -311,7 +341,7 @@ class AgentOrchestrator:
         )
         return result.scalar_one_or_none()
 
-    async def _update_progress(self, callback, agent: str, status: str, progress: int, message: str = None, paper_id: int = None):
+    async def _update_progress(self, callback, agent: str, status: str, progress: int, message: str = None, paper_id: int = None, scores: dict = None):
         """Update progress via callback"""
         if callback:
             msg = message if message else f"{agent} is {status}"
@@ -323,59 +353,86 @@ class AgentOrchestrator:
             }
             if paper_id:
                 payload["paperId"] = paper_id
+            if scores:
+                payload["detailedScores"] = scores
             await callback(payload)
 
-    def _extract_quality_score(self, review: str) -> float:
-        """Extract quality score from review text (JSON priority)"""
+    def _extract_detailed_scores(self, review: str) -> tuple[float, dict]:
+        """Extract multi-dimensional scores from review JSON"""
         import re
         import json
 
-        # 1. Try parsing JSON first (Most reliable)
+        total_score = self._extract_quality_score(review)
+        # Default to base scores derived from total if specific ones can't be parsed
+        detailed = {
+            "novelty": max(1.0, total_score - 0.5), 
+            "quality": total_score, 
+            "clarity": min(10.0, total_score + 0.3), 
+            "total": total_score
+        }
+
         try:
-            # Find JSON block using regex if mixed with text
             json_match = re.search(r'\{.*\}', review, re.DOTALL)
             if json_match:
-                json_str = json_match.group(0)
-                data = json.loads(json_str)
+                data = json.loads(json_match.group(0))
+                if "scores" in data:
+                    s = data["scores"]
+                    detailed["novelty"] = float(s.get("novelty", detailed["novelty"]))
+                    detailed["quality"] = float(s.get("quality", detailed["quality"]))
+                    detailed["clarity"] = float(s.get("clarity", detailed["clarity"]))
+                    total_score = float(s.get("total", total_score))
+                    detailed["total"] = total_score
+                    return total_score, detailed
+        except Exception as e:
+            print(f"Error extracting detailed scores: {e}")
+
+        return total_score, detailed
+
+    def _extract_quality_score(self, review: str) -> float:
+        """Extract quality score from review text (1-10 scale)"""
+        import re
+        import json
+
+        # 1. Try parsing JSON block
+        try:
+            json_match = re.search(r'\{.*\}', review, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group(0))
                 if "scores" in data and "total" in data["scores"]:
                     return float(data["scores"]["total"])
-                # Handle flat structure fallback
-                if "total_score" in data:
-                    return float(data["total_score"])
+                if "total" in data:
+                    return float(data["total"])
                 if "score" in data:
                     return float(data["score"])
-        except Exception as e:
-            print(f"JSON parsing failed for score extraction: {e}")
-
-        # 2. Fallback to Regex patterns
-        try:
-            # Look for various patterns like "总分: 85", "Score: 90/100", "[88]"
-            patterns = [
-                r'"total":\s*(\d+(?:\.\d+)?)',  # "total": 85
-                r'总分[：:]\s*(\d+(?:\.\d+)?)',
-                r'评分[：:]\s*(\d+(?:\.\d+)?)',
-                r'Score[：:]\s*(\d+(?:\.\d+)?)',
-                r'(\d+(?:\.\d+)?)\s*/\s*100',
-                r'\[\s*(\d+(?:\.\d+)?)\s*\]'
-            ]
-
-            for pattern in patterns:
-                match = re.search(pattern, review, re.IGNORECASE)
-                if match:
-                    val = float(match.group(1))
-                    if 0 <= val <= 100:
-                        return val
-
-            # 3. Last resort: find any reasonable number between 70 and 100
-            numbers = re.findall(r'(\d+(?:\.\d+)?)', review)
-            for n in numbers:
-                val = float(n)
-                if 70 <= val <= 100:
-                    return val
-
-            return 80.0  # Default reasonable score
         except:
-            return 80.0
+            pass
+
+        # 2. Regex Patterns for 1-10 scale
+        patterns = [
+            r'"total":\s*(\d+(?:\.\d+)?)',
+            r'总分[：:]\s*(\d+(?:\.\d+)?)',
+            r'评分[：:]\s*(\d+(?:\.\d+)?)',
+            r'Score[：:]\s*(\d+(?:\.\d+)?)',
+            r'\[\s*(\d+(?:\.\d+)?)\s*\]'
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, review, re.IGNORECASE)
+            if match:
+                val = float(match.group(1))
+                if 1 <= val <= 10:
+                    return val
+                if 10 < val <= 100: # Handle accidental 0-100 scale
+                    return val / 10.0
+
+        # 3. Last resort - find any number 1-10
+        numbers = re.findall(r'(\d+(?:\.\d+)?)', review)
+        for n in numbers:
+            val = float(n)
+            if 3 <= val <= 10: # Likely a score
+                return val
+
+        return 7.0 # Default "Borderline Accept"
 
     def _extract_abstract(self, content: str) -> str:
         """Extract abstract from paper content"""

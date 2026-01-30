@@ -10,15 +10,27 @@ export interface Paper {
   version: number
   status: 'draft' | 'reviewing' | 'completed'
   quality_score: number
+  detailed_scores?: {
+    novelty: number
+    quality: number
+    clarity: number
+    total: number
+  }
   created_at: string
 }
 
 export interface AgentProgress {
   paperId?: number
   agent: string
-  status: 'waiting' | 'working' | 'completed'
+  status: 'waiting' | 'working' | 'completed' | 'reviewing_revision'
   message: string
   progress: number
+  detailedScores?: {
+    novelty: number
+    quality: number
+    clarity: number
+    total: number
+  }
 }
 
 export interface PaperTraceItem {
@@ -126,6 +138,15 @@ const papersSlice = createSlice({
           state.activePaperIds = state.activePaperIds.filter(id => id !== paperId)
           if (state.activePaperIds.length === 0) {
             state.generating = false
+          }
+
+          // Sync completion data to current paper if matches
+          if (state.currentPaper?.id === paperId) {
+            state.currentPaper.status = 'completed'
+            if (action.payload.detailedScores) {
+              state.currentPaper.detailed_scores = action.payload.detailedScores
+              state.currentPaper.quality_score = action.payload.detailedScores.total
+            }
           }
         }
       }

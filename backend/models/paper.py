@@ -15,9 +15,11 @@ class Paper(Base):
     version = Column(Integer, default=1)
     status = Column(String(20), default="draft")  # draft/reviewing/completed
     quality_score = Column(Float, default=0.0)
+    detailed_scores = Column(Text, nullable=True) # JSON string of dimension scores
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     def to_dict(self):
+        import json
         return {
             "id": self.id,
             "topic_id": self.topic_id,
@@ -28,6 +30,7 @@ class Paper(Base):
             "version": self.version,
             "status": self.status,
             "quality_score": self.quality_score,
+            "detailed_scores": json.loads(self.detailed_scores) if self.detailed_scores else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
