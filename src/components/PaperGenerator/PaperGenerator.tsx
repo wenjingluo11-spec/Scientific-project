@@ -58,6 +58,27 @@ const PaperGenerator: React.FC = () => {
     }
   }, [selectedTheme, topics])
 
+  // HOTFIX: Ensure Paper #26 (or any newly generated currentPaper) is in the active list
+  useEffect(() => {
+    if (currentPaper?.id && !activePaperIds.includes(currentPaper.id)) {
+      // If we have a current paper but it's not in the active display list, add it
+      // This handles cases where generation finished but Redux state was reset or desynced
+      dispatch(addActivePaperId(currentPaper.id));
+    }
+  }, [currentPaper, activePaperIds, dispatch]);
+
+  // Refresh papers list when any task completes to ensure we have the latest content
+  useEffect(() => {
+    // Check if any paper has a 'completed' status in its progress history
+    const hasCompleted = Object.values(multiAgentProgress).some(progressList =>
+      progressList.some(step => step.status === 'completed')
+    );
+    // If we are showing active papers and something completed, fetch latest content
+    if (activePaperIds.length > 0 && hasCompleted) {
+      dispatch(fetchPapers());
+    }
+  }, [multiAgentProgress, activePaperIds, dispatch])
+
   const toggleExpand = (paperId: number) => {
     setExpandedPaperIds(prev =>
       prev.includes(paperId)
@@ -353,8 +374,15 @@ const PaperGenerator: React.FC = () => {
                 </Card>
 
                 {/* Generated Papers Display */}
-                {activePaperIds.map(id => {
-                  const paper = allPapers.find(p => p.id === id);
+                {(activePaperIds.length > 0 ? activePaperIds : (currentPaper ? [currentPaper.id] : [])).map(id => {
+                  // Try to find the paper in the full list first (most up-to-date)
+                  let paper = allPapers.find(p => p.id === id);
+
+                  // Fallback: If not found in list, check if it matches currentPaper
+                  if (!paper && currentPaper && currentPaper.id === id) {
+                    paper = currentPaper;
+                  }
+
                   if (!paper || !paper.content) return null;
 
                   return (
