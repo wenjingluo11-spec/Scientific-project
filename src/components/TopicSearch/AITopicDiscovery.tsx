@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Form, Input, Select, Button, Card, Tag, Progress,
-  Space, Checkbox, message, Spin, Empty, Row, Col, Modal, List, Badge
+  Space, Checkbox, message, Spin, Empty, Row, Col, Modal, List, Badge, Switch
 } from 'antd'
 import { PlusOutlined, BulbOutlined, HistoryOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { RootState, AppDispatch } from '@/store/store'
@@ -37,7 +37,8 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
         topic: values.topic,
         keywords: values.keywords.split(',').map((k: string) => k.trim()),
         description: values.description,
-        num_suggestions: values.num_suggestions || 5
+        num_suggestions: values.num_suggestions || 5,
+        use_deep_research: values.use_deep_research
       })).unwrap()
 
       setCurrentSearchTopic(values.topic) // 记录当前搜索的主题
@@ -160,6 +161,19 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
               rows={3}
               placeholder="简要描述您的研究方向和兴趣，AI 将据此提供更精准的推荐..."
             />
+          </Form.Item>
+
+          <Form.Item name="use_deep_research" valuePropName="checked">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0f5ff', padding: '12px', borderRadius: 8, border: '1px solid #adc6ff' }}>
+              <Switch />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontWeight: 'bold', color: '#1d39c4' }}>启用 Gemini Deep Research 深度调研</span>
+                <span style={{ fontSize: 12, color: '#666' }}>
+                  智能体将自主进行长达数分钟的广泛文献搜索与深度阅读，生成更具前瞻性的选题。
+                  (耗时较长，请耐心等待)
+                </span>
+              </div>
+            </div>
           </Form.Item>
 
           <Form.Item>

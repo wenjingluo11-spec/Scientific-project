@@ -49,6 +49,7 @@ class TopicDiscoveryRequest(BaseModel):
     keywords: List[str]
     description: Optional[str] = None
     num_suggestions: int = 5
+    use_deep_research: bool = False
 
 
 class TopicSuggestion(BaseModel):
@@ -72,7 +73,8 @@ async def discover_topics(request: TopicDiscoveryRequest, db: AsyncSession = Dep
             keywords=request.keywords,
             topic=request.topic,
             description=request.description,
-            num_suggestions=request.num_suggestions
+            num_suggestions=request.num_suggestions,
+            use_deep_research=request.use_deep_research
         )
         return result
     except Exception as e:

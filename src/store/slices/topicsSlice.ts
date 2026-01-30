@@ -85,6 +85,7 @@ export const discoverTopics = createAsyncThunk(
     keywords: string[]
     description?: string
     num_suggestions?: number
+    use_deep_research?: boolean
   }) => {
     const response = await api.post('/api/v1/topics/ai-discover', params)
     return response.data
