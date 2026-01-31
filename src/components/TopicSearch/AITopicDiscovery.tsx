@@ -60,7 +60,8 @@ const AITopicDiscovery: React.FC<AITopicDiscoveryProps> = ({ onSwitchToManagemen
       description: suggestions[index].description,
       field: suggestions[index].field,
       specific_topic: currentSearchTopic, // 使用记录的主题
-      keywords: suggestions[index].keywords
+      keywords: suggestions[index].keywords,
+      model_signature: suggestions[index].model_signature
     }))
 
     try {

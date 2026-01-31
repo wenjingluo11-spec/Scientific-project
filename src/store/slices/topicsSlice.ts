@@ -11,6 +11,7 @@ export interface Topic {
   status: 'pending' | 'processing' | 'completed'
   created_at: string
   updated_at: string
+  model_signature?: string
 }
 
 export interface TopicSuggestion {

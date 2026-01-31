@@ -18,6 +18,7 @@ class TopicCreate(BaseModel):
     field: Optional[str] = None
     specific_topic: Optional[str] = None
     keywords: Optional[List[str]] = None
+    model_signature: Optional[str] = None
 
 
 class TopicResponse(BaseModel):
@@ -28,6 +29,7 @@ class TopicResponse(BaseModel):
     specific_topic: Optional[str] = None
     keywords: List[str]
     status: str
+    model_signature: Optional[str] = None
     created_at: str
     updated_at: Optional[str]
 
@@ -142,6 +144,7 @@ async def batch_create_topics(
                 specific_topic=topic_data.specific_topic,
                 keywords=json.dumps(topic_data.keywords or [], ensure_ascii=False),
                 status="pending",
+                model_signature=topic_data.model_signature,
             )
             db.add(topic)
             created.append(topic)
@@ -181,6 +184,7 @@ async def create_topic(topic_data: TopicCreate, db: AsyncSession = Depends(get_d
         specific_topic=topic_data.specific_topic,
         keywords=json.dumps(topic_data.keywords or [], ensure_ascii=False),
         status="pending",
+        model_signature=topic_data.model_signature,
     )
 
     db.add(topic)
