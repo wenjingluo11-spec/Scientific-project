@@ -26,6 +26,8 @@ remote_engine = create_async_engine(
     settings.DATABASE_URL,
     echo=True,  # 业务数据保持 SQL 输出便于调试
     future=True,
+    pool_pre_ping=True,  # 自动检查连接活性，防止 InterfaceError
+    pool_recycle=3600,   # 每小时回收连接
 )
 
 remote_session_maker = async_sessionmaker(

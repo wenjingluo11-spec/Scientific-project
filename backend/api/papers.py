@@ -79,12 +79,16 @@ async def run_paper_generation(paper_id: int, topic_ids: List[int], use_deep_res
             )
         except Exception as e:
             print(f"Background Paper Generation Error for {paper_id}: {e}")
-            # Update paper status to error
-            result = await db.execute(select(Paper).where(Paper.id == paper_id))
-            paper = result.scalar_one_or_none()
-            if paper:
-                paper.status = "error"
-                await db.commit()
+            # Update paper status to error using a FRESH session to avoid stale connection issues
+            try:
+                async with async_session_maker() as error_db:
+                    result = await error_db.execute(select(Paper).where(Paper.id == paper_id))
+                    paper = result.scalar_one_or_none()
+                    if paper:
+                        paper.status = "error"
+                        await error_db.commit()
+            except Exception as db_e:
+                print(f"Failed to update error status for paper {paper_id}: {db_e}")
 
 @router.get("/", response_model=List[PaperResponse])
 async def get_papers(db: AsyncSession = Depends(get_db)):
